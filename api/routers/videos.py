@@ -33,6 +33,24 @@ PRODUCTION_TIMEOUT_S = 600  # 10 minutes, cf. acceptation WEB-03
 router = APIRouter()
 
 
+def _safe_relative_path(candidate: str | None) -> str | None:
+    """Confine an untrusted path string under DEVIAFR_ROOT.
+
+    Returns the path relative to DEVIAFR_ROOT, or None if it's empty or
+    resolves outside the tree (path traversal via '..' or an absolute path
+    elsewhere on disk).
+    """
+    if not candidate:
+        return None
+    root = DEVIAFR_ROOT.resolve()
+    path = Path(candidate)
+    resolved = path.resolve() if path.is_absolute() else (DEVIAFR_ROOT / path).resolve()
+    try:
+        return str(resolved.relative_to(root))
+    except ValueError:
+        return None
+
+
 def _row_to_info(row: dict) -> VideoInfo:
     return VideoInfo(
         id=row["id"],
@@ -117,14 +135,18 @@ async def generate_video(request: VideoGenerateRequest):
         row = db.get_video(video_id)
         return _row_to_info(row)
 
-    # Parse la sortie de unified_pipeline.py pour récupérer les chemins produits
+    # Parse la sortie de unified_pipeline.py pour récupérer les chemins produits.
+    # Ce sont des lignes de stdout d'un subprocess, pas une valeur de retour
+    # structurée — on les traite comme non fiables et on les confine sous
+    # DEVIAFR_ROOT avant stockage (cf. _safe_relative_path), pour qu'une ligne
+    # malformée ou manipulée ne puisse pas pointer hors de l'arborescence.
     video_path = None
     thumbnail_path = None
     for line in proc.stdout.splitlines():
         if "Vidéo produite" in line and ":" in line:
-            video_path = line.split(":", 1)[1].strip()
+            video_path = _safe_relative_path(line.split(":", 1)[1].strip())
         if "Miniature" in line and ":" in line:
-            thumbnail_path = line.split(":", 1)[1].strip()
+            thumbnail_path = _safe_relative_path(line.split(":", 1)[1].strip())
 
     db.update_video(video_id, status="ready", video_path=video_path, thumbnail_path=thumbnail_path)
     row = db.get_video(video_id)
@@ -187,9 +209,15 @@ def _resolve_asset(video_id: str, field: str) -> Path:
     rel_path = row.get(field)
     if not rel_path:
         raise HTTPException(status_code=404, detail=f"{field} non disponible pour cette vidéo")
-    path = Path(rel_path)
-    if not path.is_absolute():
-        path = DEVIAFR_ROOT / path
+
+    # Re-valide au moment du service, pas seulement à l'écriture — défense en
+    # profondeur si une ligne en base venait d'avant ce correctif ou d'une
+    # modification directe de la DB.
+    safe = _safe_relative_path(rel_path)
+    if safe is None:
+        raise HTTPException(status_code=404, detail="Chemin de fichier invalide")
+
+    path = DEVIAFR_ROOT / safe
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"Fichier introuvable : {path}")
     return path
