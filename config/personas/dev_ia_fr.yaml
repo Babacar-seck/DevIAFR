@@ -1,0 +1,105 @@
+# Persona: Dev IA FR (Tech/AI pour devs francophones)
+name: "Dev IA FR"
+id: "dev_ia_fr"
+
+# Identité
+channel:
+  name: "Dev IA FR"
+  handle: "@deviafr"
+  slogan: "L'IA pratique pour les devs — sans blabla, que du code"
+  niche: "Tech/AI pour développeurs francophones"
+  language: "fr"
+  youtube_category_id: "28"
+  made_for_kids: false
+  default_tags:
+    - "IA"
+    - "intelligence artificielle"
+    - "Claude"
+    - "ChatGPT"
+    - ".NET"
+    - "Angular"
+    - "tutoriel"
+    - "français"
+    - "développeur"
+
+# Branding
+branding:
+  colors:
+    primary: "#1a1a2e"
+    accent: "#00d4ff"
+    secondary: "#7b2cbf"
+    text: "#ffffff"
+  logo_path: "storage/branding/dev_ia_fr_logo.png"
+  intro_path: "storage/branding/dev_ia_fr_intro.mp4"
+  outro_path: "storage/branding/dev_ia_fr_outro.mp4"
+
+# Voix
+voice:
+  engine: "elevenlabs"
+  voice_id: "techdev_fr_custom"
+  style: "confident, direct, tech-savvy"
+  speed: 1.0
+  pitch: 0
+
+# Script
+script:
+  storytelling:
+    structure:
+      - name: "Hook"
+        duration_pct: 5
+        description: "Question provocatrice OU promesse OU élément visuel choc"
+      - name: "Problème"
+        duration_pct: 15
+        description: "Pourquoi ce sujet matter pour le viewer"
+      - name: "Enquête"
+        duration_pct: 65
+        description: "Exploration, démonstration, étapes concrètes"
+      - name: "Twist"
+        duration_pct: 10
+        description: "Surprise, révélation, le pire c'est que..."
+      - name: "Résolution"
+        duration_pct: 3
+        description: "Ce qu'on a appris, takeaway"
+      - name: "CTA + Boucle"
+        duration_pct: 2
+        description: "Abonne-toi + phrase qui connecte au début pour re-watch"
+  tone: "conversational, direct, sans blabla, avec anecdotes personnelles"
+  examples_style: "code snippets, captures d'écran, démos live"
+  humanization:
+    anecdotes: true
+    emotions: ["frustration", "excitation", "satisfaction"]
+    personal_experience: ".NET/Angular/IA"
+
+# Contenu
+content:
+  topics:
+    - ".NET Core / ASP.NET"
+    - "Angular / TypeScript"
+    - "IA pour devs (Claude, ChatGPT, Copilot)"
+    - "Architecture logicielle"
+    - "DevOps / Docker / CI-CD"
+  format: "long-form (8-12 min)"
+  target_duration_s: 480
+  upload_schedule: "2x/semaine (mardi + jeudi)"
+
+# Qualité
+quality:
+  min_score: 75
+  weights:
+    technical: 0.3
+    content: 0.4
+    engagement: 0.3
+
+# Publication
+publishing:
+  youtube:
+    enabled: true
+    privacy: "public"
+  tiktok:
+    enabled: false
+  instagram:
+    enabled: false
+  repurposing:
+    enabled: true
+    clip_count: 3
+    clip_duration_s: 30

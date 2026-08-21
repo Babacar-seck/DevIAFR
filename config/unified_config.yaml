@@ -1,0 +1,348 @@
+# ==============================================================================
+# unified_config.yaml — Source de vérité unique pour le pipeline Dev IA FR
+# 
+# Ce fichier centralise la configuration de MoneyPrinterTurbo (MPT) et 
+# TestShortYoutube (TST). Le script sync_config.py propage les valeurs vers :
+#   - MPT : ~/MyWorkProjectGithub/MoneyPrinterTurbo/config.toml
+#   - TST : ~/MyWorkDirectory/TestShortYoutube/config.yaml
+#
+# Pour appliquer les changements : python scripts/sync_config.py
+# Pour voir les diffs sans appliquer : python scripts/sync_config.py --dry-run
+# ==============================================================================
+
+# ── Projets ──────────────────────────────────────────────────────────────────
+projects:
+  mpt:
+    path: "~/MyWorkProjectGithub/MoneyPrinterTurbo"
+    config_file: "config.toml"
+    api_port: 8080
+    webui_port: 8501
+  tst:
+    path: "~/MyWorkDirectory/TestShortYoutube"
+    config_file: "config.yaml"
+    db: "sqlite:///data/dev.db"
+
+# ── Chaîne ───────────────────────────────────────────────────────────────────
+channel:
+  name: "Dev IA FR"
+  handle: "@deviafr"
+  slogan: "L'IA pratique pour les devs — sans blabla, que du code"
+  niche: "Tech/AI pour développeurs francophones"
+  language: "fr"
+  youtube_category_id: "28"        # Science & Technology
+  made_for_kids: false
+  default_tags:
+    - "IA"
+    - "intelligence artificielle"
+    - "Claude"
+    - "ChatGPT"
+    - ".NET"
+    - "Angular"
+    - "tutoriel"
+    - "français"
+    - "développeur"
+
+# ── Branding ─────────────────────────────────────────────────────────────────
+branding:
+  colors:
+    primary: "#1a1a2e"      # bleu profond (fond)
+    accent: "#00d4ff"       # cyan néon (accent Dev IA FR)
+    secondary: "#7b2cbf"    # violet néon
+    text: "#ffffff"
+  logo_path: "storage/branding/logo.png"   # à créer
+  intro_path: "storage/branding/intro.mp4" # généré par intro_generator
+  outro_path: "storage/branding/outro.mp4"
+  intro_duration_s: 2
+  outro_duration_s: 5
+
+# ── LLM ──────────────────────────────────────────────────────────────────────
+llm:
+  # Provider principal (utilisé par MPT et TST)
+  provider: "ollama"                   # ollama | gemini | openai
+  model: "kimi-k2.7-code:cloud"        # modèle Ollama
+  ollama_base_url: "http://localhost:11434/v1"
+  # Provider secondaire (humanisation, scripts complexes)
+  humanizer_provider: "alibaba"
+  humanizer_model: "qwen3.7-max"
+  alibaba_base_url: "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
+  alibaba_api_key: ""  # Laisser vide pour utiliser $DASHSCOPE_API_KEY depuis ~/.hermes/.env
+  max_tokens: 2000
+  temperature: 0.7
+
+# ── TTS / Voix ───────────────────────────────────────────────────────────────
+tts:
+  # Engine principal : Real-Time-Voice-Cloning (local, gratuit, indétectable)
+  # Clone ta propre voix à partir de quelques secondes d'audio de référence
+  engine: "rtvc"                      # rtvc | elevenlabs | edge_tts | gemini_tts
+  rtvc:
+    project_path: "~/MyWorkProjectGithub/Real-Time-Voice-Cloning"
+    venv_python: "~/MyWorkProjectGithub/Real-Time-Voice-Cloning/.venv/bin/python"
+    models_dir: "~/MyWorkProjectGithub/Real-Time-Voice-Cloning/saved_models/default"
+    reference_voice: "storage/voice_samples/reference_voice.wav"  # ⚠️ Enregistrer ta voix ici
+    embedding_path: "storage/voice_samples/voice_embedding.npy"   # Pre-calculé pour réutilisation
+    sample_rate: 16000               # RTVC utilise 16kHz
+  # ElevenLabs (alternative payante, si RTVC ne suffit pas)
+  elevenlabs:
+    api_key: ""                        # Optionnel — RTVC est gratuit et local
+    model_id: "eleven_multilingual_v2"
+    voice_id: ""
+    voice_name: "TechDev FR"
+  # Fallback si RTVC n'est pas disponible
+  fallback_engine: "edge_tts"
+  fallback_voice: "fr-FR-HenriNeural"
+  # Normalisation audio
+  loudnorm_target: -16                # LUFS
+  loudnorm_tp: -1.5                   # True Peak dB
+  loudnorm_lra: 11                    # Loudness Range
+
+# ── Script & Storytelling ────────────────────────────────────────────────────
+script:
+  # Structure storytelling obligatoire
+  storytelling:
+    enabled: true
+    structure:
+      - name: "Hook"
+        duration_pct: 5
+        description: "Question provocatrice OU promesse OU élément visuel choc"
+      - name: "Problème"
+        duration_pct: 15
+        description: "Pourquoi ce sujet matter pour le viewer"
+      - name: "Enquête"
+        duration_pct: 65
+        description: "Exploration, démonstration, étapes concrètes"
+      - name: "Twist"
+        duration_pct: 10
+        description: "Surprise, revelation, le pire c'est que..."
+      - name: "Résolution"
+        duration_pct: 3
+        description: "Ce qu'on a appris, takeaway"
+      - name: "CTA + Boucle"
+        duration_pct: 2
+        description: "Abonne-toi + phrase qui connecte au début pour re-watch"
+  # Humanisation post-génération
+  humanization:
+    enabled: true
+    add_anecdote: true
+    add_emotion: true
+    add_example: true
+    example_domain: ".NET/Angular"    # ← Configurable par l'utilisateur. Ex: "finance", "cuisine", "fitness", "gaming"
+  # Templates de format
+  formats:
+    short:
+      max_duration_s: 60
+      max_words: 150
+      templates: ["top5", "tuto", "prompt", "news", "vs"]
+    long:
+      min_duration_s: 600
+      max_duration_s: 1200
+      templates: ["guide", "projet", "comparatif", "formation"]
+
+# ── Visuel ───────────────────────────────────────────────────────────────────
+visual:
+  # Source de matériel (priorité décroissante)
+  render_paths:
+    - "screen_recording"     # OBS — pour tutoriels code (priorité 1 pour Dev IA FR)
+    - "comfyui"              # Images IA originales (RealVisXL Lightning)
+    - "hyperframes"          # HTML+GSAP → MP4 (animations, motion graphics)
+    - "heygen"               # Avatar IA (talking head, si besoin)
+    - "mpt_pexels"           # Stock footage via MPT (fallback)
+  # ComfyUI
+  comfyui:
+    url: "http://127.0.0.1:8188"
+    checkpoint: "realvisxlV50_v50LightningBakedvae.safetensors"
+    steps: 8
+    cfg: 2.0
+    sampler: "euler"
+    scheduler: "sgm_uniform"
+    width: 1080
+    height: 1920
+  # MPT matériel
+  mpt_video_source: "pexels"
+  # Transitions (MPT MoviePy)
+  transition_mode: "Shuffle"          # None | Shuffle | FadeIn | FadeOut | SlideIn | SlideOut | ZoomIn | ZoomOut
+  clip_duration_s: 5
+  clip_speed: 1.0
+  # Format vidéo
+  short_aspect: "9:16"               # 1080x1920
+  long_aspect: "16:9"                # 1920x1080
+  fps: 30
+
+# ── Sous-titres ──────────────────────────────────────────────────────────────
+subtitles:
+  provider: "whisper"                 # whisper | edge_tts_boundaries
+  whisper:
+    model_size: "large-v3"
+    device: "cpu"
+    compute_type: "int8"
+    model_path: "storage/models/whisper-large-v3"
+  # Style burn-in
+  style:
+    font_name: "Arial-Bold.ttf"
+    font_size: 50
+    text_color: "#ffffff"
+    stroke_color: "#000000"
+    stroke_width: 1.5
+    position: "bottom"                # top | bottom | center | custom
+    background_enabled: false
+    background_color: "#000000"
+    glassmorphism: true               # style Apple verre dépoli
+
+# ── Sound Design ─────────────────────────────────────────────────────────────
+sound_design:
+  enabled: true
+  sfx_library_path: "storage/sfx/"
+  sfx_volume_db: -12
+  # Ducking (sidechain compression)
+  ducking:
+    enabled: true
+    threshold: 0.05
+    ratio: 8
+    makeup_db: 2
+  # Musique de fond
+  bgm:
+    type: "random"                    # random | sonilo | elevenlabs_music | custom
+    volume: 0.15
+
+# ── Post-processing ──────────────────────────────────────────────────────────
+post_processing:
+  silence_clipper:
+    enabled: true
+    noise_db: -30.0
+    min_duration_s: 0.5
+  design_overlays:
+    enabled: true
+    style: "glassmorphism"
+  color_grading:
+    enabled: true
+    lut_path: "storage/luts/dev_ia_fr.cube"
+    intensity: 0.7
+
+# ── Miniatures ───────────────────────────────────────────────────────────────
+thumbnail:
+  width: 1280
+  height: 720
+  format: "jpg"
+  max_size_kb: 2048
+  include_face: true
+  face_emotion_by_format:
+    guide: "curiosity"
+    projet: "satisfaction"
+    comparatif: "determination"
+    formation: "surprise"
+    top5: "surprise"
+    tuto: "curiosity"
+    news: "shock"
+    vs: "determination"
+  text_max_words: 6
+  accent_color: "#00d4ff"
+  ab_test: true                       # générer 2 variantes
+  font: "Impact.ttf"
+
+# ── Encodage final ───────────────────────────────────────────────────────────
+encoding:
+  video_codec: "libx264"
+  crf: 20
+  preset: "medium"
+  pixel_format: "yuv420p"
+  audio_codec: "aac"
+  audio_bitrate: "192k"
+  movflags: "+faststart"
+
+# ── YouTube Upload ───────────────────────────────────────────────────────────
+youtube:
+  category_id: "28"
+  privacy_status: "public"
+  made_for_kids: false
+  description_min_words: 200
+  tags_max: 15
+  tags_max_chars: 500
+  # Scheduler (heures de Paris)
+  schedule:
+    long_form:
+      days: ["tuesday", "thursday"]
+      time: "18:00"
+    shorts:
+      monday: "18:00"
+      wednesday: "18:00"
+      friday: "12:00"
+      sunday: "11:00"
+
+# ── Cross-platform ───────────────────────────────────────────────────────────
+cross_platform:
+  enabled: false                      # ⚠️ Activer après obtention clé Upload-Post
+  upload_post:
+    api_key: ""                       # ⚠️ À REMPLIR — https://docs.upload-post.com
+    username: ""
+    platforms: ["tiktok", "instagram"]
+    auto_upload: false
+    youtube_privacy_status: "public"
+  # CTA adapté par plateforme
+  cta:
+    youtube: "Abonne-toi pour plus de tutos IA !"
+    tiktok: "Follow @deviafr pour plus d'IA #tech #ia #fyp"
+    instagram: "Follow @deviafr pour plus de tutos IA #ia #tech #tutoriel"
+  # Hashtags par plateforme
+  hashtags:
+    youtube: ["#IA", "#Shorts", "#Tutoriel", "#Dev"]
+    tiktok: ["#tech", "#ia", "#dev", "#fyp", "#tutoriel"]
+    instagram: ["#ia", "#tech", "#tutoriel", "#developpeur"]
+
+# ── Quality Score ────────────────────────────────────────────────────────────
+quality:
+  min_score: 70                       # rejet si < 70/100
+  weights:
+    script: 40
+    thumbnail: 30
+    technique: 30
+  reports_path: "storage/quality_reports/"
+
+# ── Repurposing ──────────────────────────────────────────────────────────────
+repurposing:
+  enabled: true
+  max_clips: 5
+  retention_threshold: 0.8            # pics > 80% de la moyenne
+  output_path: "storage/repurposing/"
+  platforms: ["youtube_shorts", "tiktok", "instagram_reels"]
+  generate_twitter_thread: true
+  generate_linkedin_post: true
+
+# ── Analytics ────────────────────────────────────────────────────────────────
+analytics:
+  shorts_rpm_usd: 0.50
+  refresh_cron: "0 11 * * 0"          # dimanche 11h Paris
+  learning_loop:
+    enabled: true
+    top_n: 3
+    bottom_n: 3
+    learnings_file: "learnings.md"
+
+# ── Veille concurrentielle ───────────────────────────────────────────────────
+competitor_watch:
+  enabled: true
+  cron: "0 10 * * 1"                  # lundi 10h Paris
+  channels:
+    ai_tech:
+      - "AI Search"
+      - "Make Money Matt"
+      - "Yassine Sdiri"
+      - "Defend Intelligence"
+      - "Machine Learnia"
+
+# ── Anti-ban (règles critiques YouTube 2026) ────────────────────────────────
+anti_ban:
+  # Voix
+  never_use_free_voices: true         # ElevenLabs free voices = détection
+  never_clone_celebrity: true
+  one_custom_voice_per_channel: true
+  # Script
+  never_publish_without_humanization: true
+  never_copy_plus_voiceover: true
+  never_mass_upload_without_review: true
+  vary_formats: true                  # pas le même template à chaque fois
+  # Finance (si applicable)
+  never_specific_income_promises: true
+  always_include_disclaimer: true
+  # Kids (si applicable)
+  original_content_only: true         # pas de reprise de comptines
+  # Quran (si applicable)
+  never_ai_voice_for_arabic: true     # récitation réelle uniquement

@@ -1,0 +1,63 @@
+# Persona: Mini Mélodies FR (Chansons éducatives pour enfants)
+name: "Mini Mélodies FR"
+id: "mini_melodies_fr"
+
+channel:
+  name: "Mini Mélodies FR"
+  handle: "@minimelodiesfr"
+  slogan: "Apprendre en chantant — pour les tout-petits"
+  niche: "Contenu éducatif pour enfants"
+  language: "fr"
+  youtube_category_id: "22"
+  made_for_kids: true  # IMPORTANT pour COPPA
+  default_tags:
+    - "chansons enfants"
+    - "comptines"
+    - "apprentissage"
+    - "alphabet"
+    - "chiffres"
+    - "couleurs"
+
+branding:
+  colors:
+    primary: "#ff6b9d"
+    accent: "#ffd93d"
+    secondary: "#6bcf7f"
+    text: "#ffffff"
+
+voice:
+  engine: "elevenlabs"
+  voice_id: "kids_singer_fr"
+  style: "joyeux, chantant, énergique"
+  speed: 1.1
+  pitch: 3
+
+script:
+  storytelling:
+    structure:
+      - name: "Intro chantante"
+        duration_pct: 10
+        description: "Mélodie d'intro + salutation"
+      - name: "Chanson principale"
+        duration_pct: 70
+        description: "Chanson avec répétitions"
+      - name: "Interaction"
+        duration_pct: 15
+        description: "Question à l'enfant"
+      - name: "Outro"
+        duration_pct: 5
+        description: "Au revoir chanté"
+  tone: "joyeux, répétitif, simple"
+
+content:
+  topics:
+    - "Alphabet en chanson"
+    - "Compter jusqu'à 10/20/100"
+    - "Couleurs et formes"
+    - "Animaux"
+    - "Saisons"
+  format: "short-form (2-3 min)"
+  target_duration_s: 150
+
+quality:
+  min_score: 60

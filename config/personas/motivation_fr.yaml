@@ -1,0 +1,61 @@
+# Persona: Motivation FR (Motivation quotidienne)
+name: "Motivation FR"
+id: "motivation_fr"
+
+channel:
+  name: "Motivation FR"
+  handle: "@motivationfr"
+  slogan: "Ta dose quotidienne de motivation"
+  niche: "Motivation / Développement personnel"
+  language: "fr"
+  youtube_category_id: "22"
+  made_for_kids: false
+  default_tags:
+    - "motivation"
+    - "succès"
+    - "discipline"
+    - "mindset"
+    - "objectifs"
+
+branding:
+  colors:
+    primary: "#000000"
+    accent: "#ff4500"
+    secondary: "#ff8c00"
+    text: "#ffffff"
+
+voice:
+  engine: "elevenlabs"
+  voice_id: "motivator_fr"
+  style: "énergique, passionné, inspirant"
+  speed: 1.05
+  pitch: 1
+
+script:
+  storytelling:
+    structure:
+      - name: "Hook émotionnel"
+        duration_pct: 10
+        description: "Citation ou question puissante"
+      - name: "Histoire"
+        duration_pct: 50
+        description: "Histoire inspirante (sportif, entrepreneur)"
+      - name: "Leçon"
+        duration_pct: 30
+        description: "3 principes à appliquer"
+      - name: "Call to action"
+        duration_pct: 10
+        description: "Passe à l'action maintenant"
+  tone: "énergique, passionné, direct"
+
+content:
+  topics:
+    - "Discipline quotidienne"
+    - "Surmonter l'échec"
+    - "Mindset de gagnant"
+    - "Histoires de réussite"
+  format: "short-form (1-3 min)"
+  target_duration_s: 120
+
+quality:
+  min_score: 65

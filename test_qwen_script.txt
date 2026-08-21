@@ -1,0 +1,60 @@
+Voici le script optimisé pour YouTube, pensé pour retenir l'attention (rétention), créer de l'empathie et délivrer de la valeur technique pure sans ennuyer l'audience.
+
+***
+
+### 🎬 SCRIPT YOUTUBE : Les 5 erreurs fatales en architecture .NET
+
+**[Hook - 5%]**
+*(Visuel : Toi face caméra, air sérieux. En incrustation : un dashboard Application Insights qui vire au rouge sang avec des pics de CPU à 100%)*
+Ton API .NET tournait comme une horloge au lancement... et 6 mois plus tard, elle s'écroule à la moindre requête. 
+Spoiler : c’est pas la faute de Microsoft, et c'est pas la faute du framework. C’est ton architecture qui est toxique.
+
+**[Problème - 15%]**
+*(Visuel : B-Roll de toi qui te tiens la tête devant un écran de code, ou meme du "This is fine" dog)*
+Tu connais cette boule au ventre quand tu dois ajouter une simple feature sur un projet qui a 6 mois de vie ? Au début, tout est propre. Et puis les sprints s'enchaînent, les deadlines pressent... et ton codebase devient un plat de spaghettis géant. 
+Tu te retrouves à prier pour que rien ne casse quand tu push. Si tu as l'impression que ton API .NET devient de plus en plus lente et impossible à maintenir, c'est parce que tu es tombé dans l'un de ces 5 pièges mortels que je vois dans 90% des audits que je fais.
+
+**[Enquête - 65%]**
+*(Visuel : Transition dynamique, texte à l'écran "ERREUR #1")*
+**Numéro 1 : Le Fat Controller.** 
+*(Visuel : Capture d'écran d'un `UserController.cs` qui fait 800 lignes avec du try/catch partout)*
+Ton contrôleur fait 500 lignes ? Il gère la validation, la base de données, et l'envoi d'emails ? Dégage ça. Ton contrôleur c'est un aiguilleur, pas un dieu grec. Utilise le pattern Mediator, et délègue ça à des Handlers. 
+
+**Numéro 2 : Coupler ton domaine à Entity Framework.**
+*(Visuel : Zoom sur une classe de domaine avec des attributs `[Table]` et `[ForeignKey]`)*
+Si ton modèle métier pur est taché par des attributs de base de données, t'as perdu. Ton domaine, c'est le cœur de ton app, il n'a pas à savoir ce qu'est une base SQL. 
+
+**Numéro 3 : Ignorer le `CancellationToken`.**
+*(Visuel : Toi, l'air faussement en colère, tu pointes la caméra)*
+Ça, ça me rend fou. Tu ne passes pas le `CancellationToken` dans tes méthodes `async` ? Félicitations, tu viens de tuer ton Thread Pool. Quand l'utilisateur annule sa requête sur le front, ton serveur .NET, lui, il continue de bosser et de requêter la base dans le vide. C'est de la pure perte de ressources.
+
+**Numéro 4 : Ne pas abstraire tes services externes.**
+*(Visuel : Changement de ton, plus storytelling, lumière un peu plus sombre)*
+Laisse-moi te raconter ma pire guerre. Sur un gros projet .NET couplé à un front Angular, on appelait une API tierce de vérification d'identité directement dans notre service métier, sans interface, sans rien. Un jour, l'API tierce a commencé à timeout. Résultat ? Le front Angular affichait un spinner infini, les requêtes s'empilaient, et le backend .NET a leaké toutes ses connexions HTTP en 10 minutes. L'app était morte. Si tu n'abstrais pas tes appels externes avec une interface et un Circuit Breaker, tu es à la merci du premier service qui tousse.
+
+**Numéro 5 : Le tueur silencieux, le N+1 LINQ.**
+*(Visuel : Code à l'écran : une boucle `foreach` qui fait un `dbContext.SaveChanges()` ou un `.ToList()` à l'intérieur)*
+Tu fais une boucle sur tes utilisateurs pour charger leurs commandes ? Tu viens de générer 500 requêtes SQL au lieu d'une seule. Ton DBA va venir te voir avec une hache. Pense `Include` ou `Select` projeté.
+
+**[Twist - 10%]**
+*(Visuel : Zoom in lent sur ton visage, ton confident)*
+Mais le pire dans tout ça... c'est que la plupart des devs seniors pensent bien faire en appliquant la "Clean Architecture" à la lettre... et finissent par créer une usine à gaz avec 15 projets dans la solution juste pour faire un "Hello World". 
+La vérité ? La sur-abstraction tue autant que le mauvais code. Le vrai secret, c'est pas de tout séparer en 50 couches. C'est de séparer ce qui *modifie* de ce qui *lit*.
+
+**[Résolution - 3%]**
+*(Visuel : Code propre qui s'affiche avec un effet sonore "ding" satisfaisant)*
+La solution, c'est CQRS. Même dans un monolithe. 
+`public record GetUserQuery(int Id) : IRequest<UserDto>;`
+Au lieu d'injecter ton `DbContext` partout, tu sépares les lectures (les Queries, qui vont direct en base pour la perf) et les écritures (les Commands, qui passent par ton domaine). C'est scalable, c'est lisible, et ça sauve tes perfs.
+
+**[CTA + Boucle - 2%]**
+*(Visuel : Retour face caméra, sourire en coin)*
+Allez, sois honnête : laquelle de ces 5 erreurs tu as déjà push en prod le vendredi soir ? Dis-le moi en commentaire, on est entre nous, je jugerai pas. 
+Et **abonne-toi**, parce que la semaine prochaine, je te montre comment implémenter ce CQRS de A à Z... pour que ton API ne s'effondre plus jamais après 6 mois.
+
+***
+
+### 💡 Notes de réalisation pour le créateur :
+*   **Rythme :** Parle vite sur les erreurs 1, 2 et 5 (ce sont des classiques). Ralentis et mets de l'intention sur l'erreur 3 (la colère) et l'erreur 4 (l'anecdote).
+*   **Montage :** Utilise des effets de "glitch" ou des sons d'erreur Windows quand tu montres le dashboard en rouge au début et pendant l'anecdote de l'API qui crash.
+*   **Boucle :** La dernière phrase ("pour que ton API ne s'effondre plus jamais après 6 mois") répond *exactement* à la première phrase du Hook, ce qui pousse l'algorithme YouTube à recommander la vidéo en boucle (re-watch).

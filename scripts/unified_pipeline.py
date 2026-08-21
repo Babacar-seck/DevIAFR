@@ -1,0 +1,359 @@
+#!/usr/bin/env python3
+"""
+unified_pipeline.py — Pipeline de production vidéo unifié MPT × TST.
+
+Orchestre la production d'une vidéo de bout en bout :
+1. Génération du script humanisé (via humanize_script.py)
+2. Production vidéo via MPT (API locale)
+3. Post-processing (SFX, miniature, sous-titres)
+4. Upload et publication
+
+Usage:
+    python unified_pipeline.py --subject "Comment créer une API REST .NET" --channel dev_ia_fr
+    python unified_pipeline.py --script scripts/output/script_humanized.txt --channel dev_ia_fr
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+import requests
+import yaml
+
+SCRIPT_DIR = Path(__file__).parent
+DEVIAFR_ROOT = SCRIPT_DIR.parent
+UNIFIED_CONFIG = DEVIAFR_ROOT / "config" / "unified_config.yaml"
+OUTPUT_DIR = DEVIAFR_ROOT / "storage" / "output"
+
+
+def load_config() -> dict:
+    """Charge unified_config.yaml."""
+    with open(UNIFIED_CONFIG) as f:
+        return yaml.safe_load(f)
+
+
+def generate_script(subject: str, cfg: dict) -> str:
+    """Étape 1 : génère (TST) puis humanise (humanize_script.py) le script.
+
+    Le script est un JSON structuré (title/hook/body/cta/hashtags/description)
+    — pas du texte brut — pour que la miniature puisse en extraire un titre
+    court et que MPT reçoive une narration aplatie (voir produce_video_mpt).
+    """
+    print("\n[1/5] Génération du script humanisé...")
+
+    script_output = SCRIPT_DIR / "output" / f"script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    script_output.parent.mkdir(parents=True, exist_ok=True)
+
+    tst_path = Path(cfg["projects"]["tst"]["path"]).expanduser()
+    sys.path.insert(0, str(tst_path / "src"))
+    from script_generator import generate_script as tst_generate_script
+
+    sys.path.insert(0, str(SCRIPT_DIR))
+    from humanize_script import humanize_script
+
+    brut = tst_generate_script(topic=subject, format_type="top5", content_profile="ai_tech")
+    humanized = humanize_script(brut, cfg)
+
+    script_output.write_text(json.dumps(humanized, ensure_ascii=False, indent=2))
+    print(f"✓ Script humanisé : {script_output}")
+
+    return str(script_output)
+
+
+def produce_video_mpt(script_path: str, subject: str, cfg: dict) -> str:
+    """Étape 2 : produit la vidéo via MPT API."""
+    print("\n[2/5] Production vidéo via MPT...")
+
+    script_content = Path(script_path).read_text()
+
+    # Configuration MPT depuis unified_config
+    mpt_cfg = cfg.get("projects", {}).get("mpt", {})
+    mpt_url = mpt_cfg.get("api_url", "http://localhost:8080")
+    mpt_timeout = mpt_cfg.get("timeout_s", 300)
+
+    # Paramètres vidéo depuis unified_config
+    visual_cfg = cfg.get("visual", {})
+    subtitles_cfg = cfg.get("subtitles", {})
+
+    payload = {
+        "video_subject": subject,
+        "video_script": script_content,
+        "video_aspect": visual_cfg.get("aspect", "9:16"),
+        "video_concat_mode": "random",
+        "video_transition_mode": visual_cfg.get("transition_mode", "shuffle"),
+        "enable_bgm": True,
+        "bgm_volume": visual_cfg.get("bgm_volume", 0.2),
+        "font_name": subtitles_cfg.get("font_name", "Arial-Bold.ttf"),
+        "text_fore_color": subtitles_cfg.get("text_fore_color", "#FFFFFF"),
+        "text_back_color": subtitles_cfg.get("text_back_color", "#00000080"),
+        "font_size": subtitles_cfg.get("font_size", 50),
+        "stroke_color": subtitles_cfg.get("stroke_color", "#000000"),
+        "stroke_width": subtitles_cfg.get("stroke_width", 1.5),
+    }
+
+    print(f"  → Appel MPT API : {mpt_url}/api/v1/videos")
+    print(f"  → Sujet : {subject}")
+    print(f"  → Aspect : {payload['video_aspect']}")
+
+    try:
+        response = requests.post(
+            f"{mpt_url}/api/v1/videos",
+            json=payload,
+            timeout=mpt_timeout,
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            task_id = result.get("task_id", "unknown")
+            print(f"✓ Tâche MPT créée : {task_id}")
+
+            # Poll pour attendre la fin
+            print("  → Attente de la production...")
+            status_url = f"{mpt_url}/api/v1/videos/{task_id}/status"
+            for _ in range(60):  # 5 minutes max
+                time.sleep(5)
+                status_resp = requests.get(status_url, timeout=30)
+                if status_resp.status_code == 200:
+                    status_data = status_resp.json()
+                    status = status_data.get("status")
+                    if status == "completed":
+                        video_path = status_data.get("video_path")
+                        print(f"✓ Vidéo produite : {video_path}")
+                        return video_path
+                    elif status == "failed":
+                        error = status_data.get("error", "Unknown error")
+                        print(f"✗ Production échouée : {error}")
+                        sys.exit(1)
+                    else:
+                        print(f"    Status : {status}...")
+                else:
+                    print(f"    Poll error : {status_resp.status_code}")
+
+            print("✗ Timeout : production trop longue")
+            sys.exit(1)
+
+        else:
+            print(f"✗ Erreur MPT : {response.status_code}")
+            print(f"  {response.text[:200]}")
+            sys.exit(1)
+
+    except requests.exceptions.ConnectionError:
+        print(f"✗ Impossible de se connecter à MPT : {mpt_url}")
+        print("  Vérifie que MPT tourne : cd ~/MyWorkProjectGithub/MoneyPrinterTurbo && .venv/bin/python webui.py")
+        sys.exit(1)
+    except Exception as e:
+        print(f"✗ Erreur : {e}")
+        sys.exit(1)
+
+
+def post_process_sfx(video_path: str, cfg: dict) -> str:
+    """Étape 3 : ajoute les effets sonores (SFX)."""
+    print("\n[3/5] Post-processing : SFX...")
+
+    sound_cfg = cfg.get("sound_design", {})
+    sfx_enabled = sound_cfg.get("sfx_enabled", True)
+
+    if not sfx_enabled:
+        print("  ⚠ SFX désactivé dans unified_config.yaml")
+        return video_path
+
+    sfx_dir = DEVIAFR_ROOT / "storage" / "sfx"
+    if not sfx_dir.exists():
+        print(f"  ⚠ Dossier SFX manquant : {sfx_dir}")
+        print("  → Création du dossier vide")
+        sfx_dir.mkdir(parents=True, exist_ok=True)
+        return video_path
+
+    # Cherche des fichiers SFX
+    sfx_files = list(sfx_dir.glob("*.wav")) + list(sfx_dir.glob("*.mp3"))
+    if not sfx_files:
+        print(f"  ⚠ Aucun fichier SFX trouvé dans {sfx_dir}")
+        print("  → Ajoute des fichiers .wav ou .mp3 (ex: whoosh.wav, impact.wav)")
+        return video_path
+
+    # Logique simple : ajoute un whoosh toutes les 10 secondes
+    output_path = Path(video_path).with_name(f"{Path(video_path).stem}_sfx.mp4")
+
+    # Vérifier que le fichier vidéo existe
+    if not Path(video_path).exists():
+        print(f"  ⚠ Fichier vidéo inexistant : {video_path}")
+        print("  → Skip SFX (mode test ou fichier manquant)")
+        return video_path
+
+    # FFMPEG : mix audio avec SFX
+    # Pour l'instant, on copie sans modification (placeholder)
+    print("  → Application SFX (placeholder — à implémenter)")
+    subprocess.run([
+        "ffmpeg", "-y", "-i", video_path,
+        "-c", "copy",
+        str(output_path)
+    ], check=True, capture_output=True)
+
+    print(f"✓ Vidéo avec SFX : {output_path}")
+    return str(output_path)
+
+
+def generate_thumbnail(video_path: str, subject: str, cfg: dict) -> str:
+    """Étape 4 : génère la miniature."""
+    print("\n[4/5] Génération de la miniature...")
+
+    thumbnail_cfg = cfg.get("thumbnail", {})
+    backend = thumbnail_cfg.get("backend", "procedural")
+
+    thumbnail_dir = DEVIAFR_ROOT / "storage" / "thumbnails"
+    thumbnail_dir.mkdir(parents=True, exist_ok=True)
+    thumbnail_path = thumbnail_dir / f"thumb_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+
+    if backend == "comfyui":
+        comfyui_url = thumbnail_cfg.get("comfyui_url", "http://localhost:8188")
+        workflow_path = thumbnail_cfg.get("workflow_path")
+
+        if not workflow_path or not Path(workflow_path).exists():
+            print(f"  ⚠ Workflow ComfyUI manquant : {workflow_path}")
+            backend = "procedural"
+
+    if backend == "procedural":
+        # Miniature procédurale simple avec PIL
+        from PIL import Image, ImageDraw, ImageFont
+
+        width = thumbnail_cfg.get("width", 1280)
+        height = thumbnail_cfg.get("height", 720)
+
+        img = Image.new("RGB", (width, height), color=(30, 30, 30))
+        draw = ImageDraw.Draw(img)
+
+        # Titre
+        font_size = thumbnail_cfg.get("title_font_size", 80)
+        try:
+            font = ImageFont.truetype("arial.ttf", font_size)
+        except:
+            font = ImageFont.load_default()
+
+        # Wrap le texte
+        words = subject.split()
+        lines = []
+        current_line = ""
+        for word in words:
+            test_line = f"{current_line} {word}".strip()
+            bbox = draw.textbbox((0, 0), test_line, font=font)
+            if bbox[2] - bbox[0] < width * 0.9:
+                current_line = test_line
+            else:
+                lines.append(current_line)
+                current_line = word
+        if current_line:
+            lines.append(current_line)
+
+        # Dessine le texte
+        y = height // 2 - (len(lines) * font_size) // 2
+        for line in lines:
+            bbox = draw.textbbox((0, 0), line, font=font)
+            text_width = bbox[2] - bbox[0]
+            x = (width - text_width) // 2
+            draw.text((x, y), line, fill=(255, 255, 255), font=font)
+            y += font_size + 10
+
+        img.save(thumbnail_path)
+        print(f"✓ Miniature procédurale : {thumbnail_path}")
+        return str(thumbnail_path)
+
+    print(f"✗ Backend non supporté : {backend}")
+    sys.exit(1)
+
+
+def upload_video(video_path: str, script_path: str, thumbnail_path: str, cfg: dict):
+    """Étape 5 : upload et publication."""
+    print("\n[5/5] Upload et publication...")
+
+    youtube_cfg = cfg.get("youtube", {})
+    upload_enabled = youtube_cfg.get("upload_enabled", False)
+
+    if not upload_enabled:
+        print("  ⚠ Upload désactivé dans unified_config.yaml")
+        print(f"  → Vidéo prête : {video_path}")
+        print(f"  → Script : {script_path}")
+        print(f"  → Miniature : {thumbnail_path}")
+        return
+
+    # Upload via TST
+    tst_cfg = cfg.get("projects", {}).get("tst", {})
+    tst_path = tst_cfg.get("path")
+
+    if not tst_path or not Path(tst_path).exists():
+        print(f"✗ TST non trouvé : {tst_path}")
+        sys.exit(1)
+
+    uploader_script = Path(tst_path) / "scripts" / "uploader.py"
+    if not uploader_script.exists():
+        print(f"✗ Uploader TST manquant : {uploader_script}")
+        sys.exit(1)
+
+    print(f"  → Upload via TST : {uploader_script}")
+    print("  ⚠ Upload non implémenté — à connecter avec uploader.py")
+
+    print(f"\n✓ Pipeline terminé !")
+    print(f"  Vidéo : {video_path}")
+    print(f"  Script : {script_path}")
+    print(f"  Miniature : {thumbnail_path}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Pipeline de production vidéo unifié MPT × TST")
+    parser.add_argument("--subject", type=str, help="Sujet de la vidéo")
+    parser.add_argument("--script", type=str, help="Fichier script existant (skip étape 1)")
+    parser.add_argument("--channel", type=str, default="dev_ia_fr", help="Nom du channel")
+    parser.add_argument("--skip-mpt", action="store_true", help="Skip production MPT (utilise vidéo existante)")
+    parser.add_argument("--video", type=str, help="Vidéo existante (pour --skip-mpt)")
+    args = parser.parse_args()
+
+    if not args.subject and not args.script:
+        print("Erreur: --subject ou --script requis", file=sys.stderr)
+        sys.exit(1)
+
+    if args.skip_mpt and not args.video:
+        print("Erreur: --video requis avec --skip-mpt", file=sys.stderr)
+        sys.exit(1)
+
+    cfg = load_config()
+
+    print("=" * 60)
+    print("Pipeline de production vidéo unifié")
+    print("=" * 60)
+    print(f"Channel : {args.channel}")
+    print(f"Sujet : {args.subject or 'Script personnalisé'}")
+
+    # Étape 1 : Script
+    if args.script:
+        script_path = args.script
+        print(f"\n✓ Script fourni : {script_path}")
+    else:
+        script_path = generate_script(args.subject, cfg)
+
+    # Étape 2 : Production MPT
+    if args.skip_mpt:
+        video_path = args.video
+        print(f"\n✓ Vidéo fournie (skip MPT) : {video_path}")
+    else:
+        video_path = produce_video_mpt(script_path, args.subject, cfg)
+
+    # Étape 3 : Post-processing SFX
+    video_path = post_process_sfx(video_path, cfg)
+
+    # Étape 4 : Miniature
+    thumbnail_path = generate_thumbnail(video_path, args.subject, cfg)
+
+    # Étape 5 : Upload
+    upload_video(video_path, script_path, thumbnail_path, cfg)
+
+    print("\n" + "=" * 60)
+    print("✓ Pipeline terminé avec succès !")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()

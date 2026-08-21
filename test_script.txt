@@ -1,0 +1,59 @@
+*(Musique d'intro dynamique et techno. Énergie high.)*
+
+---
+
+## 📺 SCRIPT YOUTUBE : API REST .NET & EF CORE
+
+### 🎤 [HOOOK] (Durée : 5%)
+**(Visuel : Un code complexe qui s’écroule, puis un écran de console propre avec une requête réussie.)**
+
+**SCRIPT :**
+Hey les devs ! Stop. Si ton backend ressemble actuellement à un labyrinthe de requêtes SQL manuelles, si chaque *endpoint* te prend deux jours à écrire… alors ce tuto est fait pour toi.
+
+Aujourd'hui, on va faire un truc qui va te faire dire : « C'est de la magie noire, mais c'est de la tech. » On va construire une API REST propre, ultra-robuste, en utilisant le duo de choc : **.NET Core et Entity Framework Core.**
+
+On te promet une back-end qui ne fera PLUS jamais peur à ton futur employeur. On y va ?
+
+***
+
+### 📉 [PROBLÈME] (Durée : 15%)
+**(Visuel : Schéma simple : Frontend ➡️ ??? ➡️ Base de données. Le ??? est une zone de frustration.)**
+
+**SCRIPT :**
+Alors, pourquoi ce sujet est crucial ? Parce que construire une API, ce n'est pas juste taper `SELECT *`. Le vrai problème, c'est de faire le pont entre deux mondes très différents : le monde *structuré* de ta base de données (SQL, les tables, les relations) et le monde *flexible* de ton frontend (JSON, les requêtes HTTP).
+
+Le piège classique, c'est qu'au début, on tombe dans le **« Spaghetti Code » de la data**. Chaque fois qu'on veut récupérer un utilisateur avec ses commandes, et qu'on veut les commandes avec les produits… boom ! On écrit des *JOIN* complexes, on gère les transactions manuellement. C'est chronophage, c'est fragile, et si tu changes un nom de colonne, tu passes des heures à déboguer.
+
+On veut de l'abstraction. On veut juste faire des appels HTTP simples, et qu'EF Core fasse tout le sale boulot en coulisses.
+
+***
+
+### 🧠 [ENQUÊTE] (Durée : 65%)
+**(Visuel : Démo de code en direct. Transition fluide entre les modèles, le DbContext, et le contrôleur.)**
+
+**SCRIPT :**
+Pour résoudre ça, il faut comprendre que le secret, ce n'est pas dans le SQL, mais dans le **Pattern**.
+
+**Étape 1 : Le Contrat (Models & DbContext).**
+On commence par nos modèles. Ce sont les classes C# qui représentent nos tables. Ensuite, on a le `DbContext`. C'est notre *porte d'entrée* unique et magique vers la base de données. Il centralise toutes nos connexions et nos jeux de données.
+
+**Étape 2 : Le Repository (La Séparation des responsabilités).**
+Pour garder notre code propre, on utilise le pattern Repository. Ton contrôleur ne doit *jamais* parler directement à la base. Il doit parler au Repository, qui lui, parle au `DbContext`. C'est la propreté architecturale garantie.
+
+**Étape 3 : La Magie (Le Code Clean).**
+Regarde la différence. Au lieu d'écrire : `SELECT * FROM Users WHERE Age > 30 AND Status = 'Active'`, ce qui te met en crise de SQL, tu écris : `_context.Users.Where(u => u.Age > 30 && u.Status == "Active")`.
+
+*(Pause pour l'effet de surprise)*
+
+C'est tout. C'est LINQ. C'est ça la puissance. EF Core prend cette requête .NET, elle la traduit en SQL optimisé, elle exécute la transaction, et elle te rend le tout dans des objets C# *prêts à être serialisés en JSON*.
+
+**[ANECDOTE PERSONNELLE – Injecter l'émotion]**
+Je me souviens d'une époque, quand je travaillais sur un grand projet avec Angular et un vieux backend .NET. On était tellement centrés sur des *Service Layers* super épais, qu'on ajoutait des validations, des mappings, des appels... au point qu'on avait atteint le syndrome du "Boilerplate Hell". J'étais tellement frustré par ce code répétitif, que j'ai basculé sur EF Core, et le coup de grâce a été de voir qu'une ligne de code LINQ faisait le travail de quinze méthodes de mapping. C'était un soulagement immense. Ça a changé ma façon de voir le développement backend.
+
+**[Exemple Concret de CRUD]**
+Pour faire un CRUD complet ? On a la méthode `Add()` pour créer, et `SaveChanges()` pour dire : « OK, exécute la transaction. » C'est aussi simple que ça.
+
+***
+
+### 🛑 [TWIST] (Durée : 10%)
+**(Visuel : Le code devient plus complexe, une alerte de performance apparaît.)**

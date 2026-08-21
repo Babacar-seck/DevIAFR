@@ -1,0 +1,65 @@
+# Persona: Coran Lumière FR (Récitation + explication Coran)
+name: "Coran Lumière FR"
+id: "coran_lumiere_fr"
+
+channel:
+  name: "Coran Lumière FR"
+  handle: "@coranlumierefr"
+  slogan: "Comprendre le Coran — verset par verset"
+  niche: "Spiritualité / Religion"
+  language: "fr"
+  youtube_category_id: "22"
+  made_for_kids: false
+  default_tags:
+    - "Coran"
+    - "Islam"
+    - "spiritualité"
+    - "récitation"
+    - "tafsir"
+    - "verset"
+
+branding:
+  colors:
+    primary: "#1a4d2e"
+    accent: "#d4af37"
+    secondary: "#2c7a4a"
+    text: "#ffffff"
+
+voice:
+  engine: "elevenlabs"
+  voice_id: "quran_narrator_fr"
+  style: "respectueux, calme, posé"
+  speed: 0.85
+  pitch: -2
+
+script:
+  storytelling:
+    structure:
+      - name: "Ouverture"
+        duration_pct: 5
+        description: "Bismillah + introduction du verset"
+      - name: "Récitation"
+        duration_pct: 20
+        description: "Récitation en arabe + traduction"
+      - name: "Contexte"
+        duration_pct: 25
+        description: "Contexte historique (asbab al-nuzul)"
+      - name: "Tafsir"
+        duration_pct: 40
+        description: "Explication et enseignements"
+      - name: "Application"
+        duration_pct: 10
+        description: "Comment appliquer dans la vie quotidienne"
+  tone: "respectueux, pédagogique, spirituel"
+
+content:
+  topics:
+    - "Tafsir verset par verset"
+    - "Histoires des prophètes"
+    - "Éthique islamique"
+    - "Vie du Prophète (PBSL)"
+  format: "medium-form (8-12 min)"
+  target_duration_s: 600
+
+quality:
+  min_score: 70

@@ -1,0 +1,68 @@
+# Persona: Finance Par Âge (Conseils financiers par tranche d'âge)
+name: "Finance Par Âge"
+id: "finance_par_age"
+
+channel:
+  name: "Finance Par Âge"
+  handle: "@financeparage"
+  slogan: "Gérer ton argent selon ton âge — 20, 30, 40, 50 ans"
+  niche: "Finance personnelle pour francophones"
+  language: "fr"
+  youtube_category_id: "22"  # People & Blogs
+  made_for_kids: false
+  default_tags:
+    - "finance"
+    - "argent"
+    - "investissement"
+    - "épargne"
+    - "budget"
+    - "retraite"
+    - "immobilier"
+    - "bourse"
+
+branding:
+  colors:
+    primary: "#0d4f3c"
+    accent: "#ffd700"
+    secondary: "#1a7a5a"
+    text: "#ffffff"
+
+voice:
+  engine: "elevenlabs"
+  voice_id: "finance_advisor_fr"
+  style: "calme, pédagogique, rassurant"
+  speed: 0.95
+  pitch: -1
+
+script:
+  storytelling:
+    structure:
+      - name: "Hook"
+        duration_pct: 5
+        description: "Statistique choc ou question d'argent"
+      - name: "Problème"
+        duration_pct: 15
+        description: "Erreur financière commune à cet âge"
+      - name: "Solution"
+        duration_pct: 60
+        description: "Stratégie étape par étape"
+      - name: "Exemple concret"
+        duration_pct: 15
+        description: "Cas réel avec chiffres"
+      - name: "CTA"
+        duration_pct: 5
+        description: "Télécharge le guide gratuit"
+  tone: "pédagogique, bienveillant, sans jugement"
+
+content:
+  topics:
+    - "Budget 50/30/20"
+    - "Épargne de précaution"
+    - "Investissement bourse (ETF, PEA)"
+    - "Immobilier locatif"
+    - "Retraite et assurance-vie"
+  format: "long-form (10-15 min)"
+  target_duration_s: 720
+
+quality:
+  min_score: 70

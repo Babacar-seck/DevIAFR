@@ -1,0 +1,66 @@
+# Persona: Psy Stick FR (Psychologie avec stick figures)
+name: "Psy Stick FR"
+id: "psy_stick_fr"
+
+channel:
+  name: "Psy Stick FR"
+  handle: "@psystickfr"
+  slogan: "La psychologie expliquée simplement — avec des bonhommes"
+  niche: "Psychologie / Développement personnel"
+  language: "fr"
+  youtube_category_id: "27"  # Education
+  made_for_kids: false
+  default_tags:
+    - "psychologie"
+    - "développement personnel"
+    - "bien-être"
+    - "anxiété"
+    - "confiance en soi"
+    - "relations"
+
+branding:
+  colors:
+    primary: "#2c3e50"
+    accent: "#e74c3c"
+    secondary: "#3498db"
+    text: "#ffffff"
+
+voice:
+  engine: "elevenlabs"
+  voice_id: "psy_narrator_fr"
+  style: "calme, empathique, narratif"
+  speed: 0.9
+  pitch: 0
+
+script:
+  storytelling:
+    structure:
+      - name: "Hook"
+        duration_pct: 5
+        description: "Situation émotionnelle universelle"
+      - name: "Problème"
+        duration_pct: 15
+        description: "Pourquoi on souffre de ça"
+      - name: "Explication psy"
+        duration_pct: 50
+        description: "Concept psychologique avec métaphore"
+      - name: "Solution pratique"
+        duration_pct: 25
+        description: "3 actions concrètes"
+      - name: "CTA"
+        duration_pct: 5
+        description: "Partage avec quelqu'un qui en a besoin"
+  tone: "empathique, vulgarisateur, rassurant"
+
+content:
+  topics:
+    - "Gestion de l'anxiété"
+    - "Confiance en soi"
+    - "Relations toxiques"
+    - "Procrastination"
+    - "Burn-out"
+  format: "medium-form (6-10 min)"
+  target_duration_s: 480
+
+quality:
+  min_score: 65
