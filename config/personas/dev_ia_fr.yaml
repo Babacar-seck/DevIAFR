@@ -33,13 +33,13 @@ branding:
   intro_path: "storage/branding/dev_ia_fr_intro.mp4"
   outro_path: "storage/branding/dev_ia_fr_outro.mp4"
 
-# Voix
+# Voix (RTVC - Real-Time Voice Cloning, 100% local et gratuit)
 voice:
-  engine: "elevenlabs"
-  voice_id: "techdev_fr_custom"
+  engine: "rtvc"
+  voice_id: "dev_ia_fr"
+  voice_sample: "voice_samples/dev_ia_fr.wav"
   style: "confident, direct, tech-savvy"
   speed: 1.0
-  pitch: 0
 
 # Script
 script:

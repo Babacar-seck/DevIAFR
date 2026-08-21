@@ -25,11 +25,11 @@ branding:
     text: "#ffffff"
 
 voice:
-  engine: "elevenlabs"
+  engine: "rtvc"
   voice_id: "motivator_fr"
+  voice_sample: "voice_samples/motivation_fr.wav"
   style: "énergique, passionné, inspirant"
   speed: 1.05
-  pitch: 1
 
 script:
   storytelling:

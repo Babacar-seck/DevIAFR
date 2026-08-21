@@ -26,11 +26,11 @@ branding:
     text: "#ffffff"
 
 voice:
-  engine: "elevenlabs"
+  engine: "rtvc"
   voice_id: "kids_singer_fr"
+  voice_sample: "voice_samples/mini_melodies_fr.wav"
   style: "joyeux, chantant, énergique"
   speed: 1.1
-  pitch: 3
 
 script:
   storytelling:

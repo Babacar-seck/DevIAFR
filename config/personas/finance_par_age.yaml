@@ -28,11 +28,11 @@ branding:
     text: "#ffffff"
 
 voice:
-  engine: "elevenlabs"
+  engine: "rtvc"
   voice_id: "finance_advisor_fr"
+  voice_sample: "voice_samples/finance_par_age.wav"
   style: "calme, pédagogique, rassurant"
   speed: 0.95
-  pitch: -1
 
 script:
   storytelling:

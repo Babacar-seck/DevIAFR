@@ -26,11 +26,11 @@ branding:
     text: "#ffffff"
 
 voice:
-  engine: "elevenlabs"
+  engine: "rtvc"
   voice_id: "quran_narrator_fr"
+  voice_sample: "voice_samples/coran_lumiere_fr.wav"
   style: "respectueux, calme, posé"
   speed: 0.85
-  pitch: -2
 
 script:
   storytelling:

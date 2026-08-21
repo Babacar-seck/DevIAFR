@@ -11,11 +11,11 @@ branding:
     secondary: '#3498db'
     text: '#ffffff'
 voice:
-  engine: elevenlabs
-  voice_id: psy_narrator_fr
+  engine: "rtvc"
+  voice_id: "psy_narrator_fr"
+  voice_sample: "voice_samples/psy_stick_fr.wav"
   style: calme, empathique, narratif
   speed: 0.9
-  pitch: 0
 script:
   tone: empathique, vulgarisateur, rassurant
   storytelling:
