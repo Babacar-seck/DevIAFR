@@ -31,6 +31,10 @@ voice:
   voice_sample: "voice_samples/mini_melodies_fr.wav"
   style: "joyeux, chantant, énergique"
   speed: 1.1
+  ton: "Enjoué, musical, doux, souriant et dynamique."
+  accent: "Français expressif et vivant."
+  age_genre: "Jeune femme ou voix neutre et lumineuse."
+  prompt_specifique: "Parle sur un ton très joyeux, mélodique et léger, comme pour introduire une mini-mélodie ou une histoire pour enfants. La voix sautille légèrement avec beaucoup de chaleur et d'énergie positive."
 
 script:
   storytelling:

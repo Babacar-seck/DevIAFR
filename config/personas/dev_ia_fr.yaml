@@ -40,6 +40,10 @@ voice:
   voice_sample: "voice_samples/dev_ia_fr.wav"
   style: "confident, direct, tech-savvy"
   speed: 1.0
+  ton: "Pédagogue, passionné, calme, moderne et direct."
+  accent: "Français neutre, léger jargon technique prononcé naturellement."
+  age_genre: "Homme ou femme, 30-40 ans."
+  prompt_specifique: "Parle comme un ingénieur en intelligence artificielle qui explique un concept complexe à un collègue. Le ton est confiant, amical, précis et légèrement enthousiaste quand il s'agit de code ou d'innovation."
 
 # Script
 script:

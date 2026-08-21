@@ -16,6 +16,10 @@ voice:
   voice_sample: "voice_samples/psy_stick_fr.wav"
   style: calme, empathique, narratif
   speed: 0.9
+  ton: "Empathique mais ferme, percutant, bienveillant, sans jugement."
+  accent: "Français chaleureux, voix grave et enveloppante."
+  age_genre: "Homme ou femme, 45-55 ans."
+  prompt_specifique: "Parle comme un thérapeute direct et lucide. La voix est calme, profondément à l'écoute, mais capable de poser des questions franches qui bousculent doucement. Le ton est ancré et sécurisant."
 script:
   tone: empathique, vulgarisateur, rassurant
   storytelling:

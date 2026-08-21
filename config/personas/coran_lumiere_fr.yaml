@@ -31,6 +31,10 @@ voice:
   voice_sample: "voice_samples/coran_lumiere_fr.wav"
   style: "respectueux, calme, posé"
   speed: 0.85
+  ton: "Solennel, apaisant, respectueux, mélodieux et profondément spirituel."
+  accent: "Français classique, diction très propre et inspirée."
+  age_genre: "Homme, 50+ ans (timbre noble et chaleureux)."
+  prompt_specifique: "Lis ou récite avec une voix de sage, empreinte de paix intérieure, de lumière et de sérénité. Le souffle est maîtrisé, le rythme est lent et mélodieux, propice à la méditation et au recueillement."
 
 script:
   storytelling:

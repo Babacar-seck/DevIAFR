@@ -33,6 +33,10 @@ voice:
   voice_sample: "voice_samples/finance_par_age.wav"
   style: "calme, pédagogique, rassurant"
   speed: 0.95
+  ton: "Rassurant, professionnel, structuré, objectif et convaincant."
+  accent: "Français formel, articulation soignée."
+  age_genre: "Homme ou femme, 40-50 ans (voix mature et stable)."
+  prompt_specifique: "Parle comme un expert en gestion de patrimoine. La voix doit inspirer une totale confiance, la sécurité et la clarté. Le rythme est mesuré, posé, idéal pour expliquer des stratégies d'épargne selon l'âge."
 
 script:
   storytelling:

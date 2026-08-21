@@ -37,6 +37,10 @@ class VoiceConfig(BaseModel):
     style: str = "confident"
     speed: float = 1.0
     pitch: int = 0
+    ton: Optional[str] = None
+    accent: Optional[str] = None
+    age_genre: Optional[str] = None
+    prompt_specifique: Optional[str] = None
 
 
 class PersonaBase(BaseModel):

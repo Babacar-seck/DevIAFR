@@ -59,6 +59,10 @@ def _yaml_to_persona(persona_id: str, raw: dict, file_path: Path) -> Persona:
             "style": voice_raw.get("style", "confident"),
             "speed": voice_raw.get("speed", 1.0),
             "pitch": voice_raw.get("pitch", 0),
+            "ton": voice_raw.get("ton"),
+            "accent": voice_raw.get("accent"),
+            "age_genre": voice_raw.get("age_genre"),
+            "prompt_specifique": voice_raw.get("prompt_specifique"),
         }) if voice_raw else None,
         branding={"colors": branding_colors} if branding_colors else None,
         script=ScriptConfig(
@@ -107,6 +111,10 @@ def _persona_to_yaml(data: PersonaCreate) -> dict:
             "style": voice.style,
             "speed": voice.speed,
             "pitch": voice.pitch,
+            "ton": voice.ton,
+            "accent": voice.accent,
+            "age_genre": voice.age_genre,
+            "prompt_specifique": voice.prompt_specifique,
         },
         "script": {
             "tone": data.tone or script.tone,

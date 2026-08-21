@@ -30,6 +30,10 @@ voice:
   voice_sample: "voice_samples/motivation_fr.wav"
   style: "énergique, passionné, inspirant"
   speed: 1.05
+  ton: "Énergique, puissant, galvanisant, inspirant et ferme."
+  accent: "Français dynamique, fort impact."
+  age_genre: "Homme ou femme, 30-45 ans."
+  prompt_specifique: "Parle comme un coach sportif ou de vie de haut niveau, avec beaucoup de philosophie. La voix dégage une énergie inébranlable, pousse à l'action, avec des variations de volume et d'intensité pour marquer les moments clés de motivation."
 
 script:
   storytelling:
