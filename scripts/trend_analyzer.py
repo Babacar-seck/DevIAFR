@@ -19,6 +19,27 @@ from datetime import datetime, timedelta
 # Ajouter les scripts au path
 sys.path.insert(0, str(Path(__file__).parent))
 
+UNIFIED_CONFIG = Path(__file__).parent.parent / "config" / "unified_config.yaml"
+
+
+def load_unified_config() -> Dict:
+    """Charge unified_config.yaml (nécessaire pour call_llm, indépendant du persona)."""
+    import yaml
+    with open(UNIFIED_CONFIG, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def _extract_json(raw: str) -> Dict:
+    """Extrait un objet JSON d'une réponse LLM qui peut contenir des balises markdown."""
+    raw = raw.strip()
+    if "```" in raw:
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+    start, end = raw.find("{"), raw.rfind("}") + 1
+    return json.loads(raw[start:end])
+
 
 class TrendAnalyzer:
     """Analyse les tendances pour générer des sujets de vidéos"""
@@ -174,6 +195,49 @@ class TrendAnalyzer:
         
         return best_topics
     
+    def generate_ai_subject(self) -> Dict:
+        """Synthétise UN sujet de vidéo optimisé viralité à partir des tendances réelles.
+
+        analyze_youtube_trends() ne fait que décliner les topics du persona en
+        variations de titres (score simulé), donc le signal de tendance réel
+        vient d'analyze_google_trends() (pytrends). On ne retombe sur le
+        générateur de variations que si Google Trends n'a rien renvoyé
+        (indisponible / clé absente), pour ne jamais renvoyer un sujet vide.
+        """
+        trends = self.analyze_google_trends(max_results=8)
+        if not trends:
+            print("  ⚠ Google Trends indisponible — repli sur les topics du persona")
+            trends = self.analyze_youtube_trends(max_results=8)
+        if not trends:
+            raise RuntimeError("Aucun signal de tendance disponible (persona sans topics ni Google Trends)")
+
+        signals = "\n".join(
+            f"- {t.get('query') or t['title']} (score tendance: {t['trend_score']}/100, thème: {t['topic']})"
+            for t in trends
+        )
+
+        channel_cfg = self.persona.get("channel", {})
+        niche = channel_cfg.get("niche", self.persona.get("niche", ""))
+        tone = channel_cfg.get("tone", "")
+
+        prompt = f"""Tu es un stratège viralité YouTube Shorts francophone, expert en growth hacking.
+
+Niche de la chaîne : {niche}
+Ton de la chaîne : {tone}
+
+Voici des tendances réelles du moment (Google Trends, France, 3 derniers mois) liées à cette niche :
+{signals}
+
+À partir de CES tendances réelles, invente UN SEUL sujet de vidéo Short (60s) avec le maximum de chances de devenir viral : accrocheur, formulé comme un titre YouTube percutant (pas une question plate), qui exploite une tendance actuelle.
+
+Retourne UNIQUEMENT un JSON valide avec cette structure :
+{{"subject": "le sujet de vidéo", "based_on_trend": "la tendance exacte utilisée", "why_viral": "1 phrase expliquant le potentiel viral"}}"""
+
+        cfg = load_unified_config()
+        from humanize_script import call_llm
+        raw = call_llm(prompt, cfg, max_tokens=400, temperature=0.9)
+        return _extract_json(raw)
+
     def save_topics(self, topics: List[Dict], output_path: str):
         """Sauvegarde les topics dans un fichier JSON"""
         output = {

@@ -250,6 +250,7 @@ encoding:
 
 # ── YouTube Upload ───────────────────────────────────────────────────────────
 youtube:
+  upload_enabled: false               # ⚠️ Opt-in explicite — passer à true pour activer l'upload réel via TST
   category_id: "28"
   privacy_status: "public"
   made_for_kids: false

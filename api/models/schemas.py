@@ -106,6 +106,13 @@ class VideoInfo(BaseModel):
     duration_s: Optional[float] = None
 
 
+class SubjectSuggestion(BaseModel):
+    """Sujet de vidéo suggéré par IA à partir des tendances réelles (Google Trends)."""
+    subject: str
+    based_on_trend: Optional[str] = None
+    why_viral: Optional[str] = None
+
+
 class VideoListItem(BaseModel):
     """Vidéo dans une liste (métadonnées légères)."""
     id: str

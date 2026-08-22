@@ -61,7 +61,15 @@ def generate_script(subject: str, cfg: dict) -> str:
     humanized = humanize_script(brut, subject, cfg)
 
     script_output.write_text(humanized, encoding="utf-8")
+
+    # Sidecar JSON (title/hook/body/cta/hashtags/description) — humanize_script()
+    # ne renvoie que de la prose narrative, donc c'est la seule source de
+    # métadonnées structurées pour l'upload YouTube (cf. uploader.py::_build_metadata).
+    metadata_output = script_output.with_suffix(".json")
+    metadata_output.write_text(json.dumps(brut, ensure_ascii=False, indent=2), encoding="utf-8")
+
     print(f"✓ Script humanisé : {script_output}")
+    print(f"✓ Métadonnées upload : {metadata_output}")
 
     return str(script_output)
 
@@ -347,7 +355,54 @@ def generate_thumbnail(video_path: str, subject: str, cfg: dict) -> str:
     sys.exit(1)
 
 
-def upload_video(video_path: str, script_path: str, thumbnail_path: str, cfg: dict):
+def _load_or_generate_metadata(script_path: str, subject: str | None, cfg: dict) -> dict:
+    """Charge le JSON de métadonnées associé au script, ou le génère via LLM si absent.
+
+    Le sidecar existe quand generate_script() a tourné dans ce process (chemin
+    --subject). Quand unified_pipeline.py est appelé avec --script — notamment
+    depuis api/routers/videos.py, qui génère le script via humanize_script.py
+    en subprocess sans jamais produire ce sidecar — on reconstruit les mêmes
+    champs par extraction LLM plutôt que par heuristique (ex. "1re ligne = titre").
+    """
+    metadata_path = Path(script_path).with_suffix(".json")
+    if metadata_path.exists():
+        return json.loads(metadata_path.read_text(encoding="utf-8"))
+
+    print(f"  ⚠ Pas de métadonnées JSON ({metadata_path.name}) — extraction via LLM")
+
+    tst_path = Path(cfg["projects"]["tst"]["path"]).expanduser()
+    sys.path.insert(0, str(tst_path / "src"))
+    from script_generator import _parse_json_response
+
+    sys.path.insert(0, str(SCRIPT_DIR))
+    from humanize_script import call_llm
+
+    script_text = Path(script_path).read_text(encoding="utf-8")
+    prompt = f"""Tu es un expert SEO YouTube Shorts francophone. Voici un script vidéo déjà écrit — extrait-en les métadonnées YouTube.
+
+SUJET : {subject or "non précisé"}
+
+SCRIPT :
+{script_text}
+
+Retourne UNIQUEMENT un JSON valide avec cette structure :
+{{
+  "title": "titre accrocheur < 80 chars avec majuscules sur 1-2 mots clés",
+  "hook": "phrase d'accroche (max 10 mots, choc ou question provocante)",
+  "body": ["phrase 1", "phrase 2", "..."],
+  "cta": "appel à l'action final",
+  "hashtags": ["IA", "Shorts", "..."],
+  "description": "description YouTube 2-3 lignes"
+}}"""
+    raw = call_llm(prompt, cfg, max_tokens=1000, temperature=0.5)
+    metadata = _parse_json_response(raw)
+
+    metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"  ✓ Métadonnées générées et sauvegardées : {metadata_path}")
+    return metadata
+
+
+def upload_video(video_path: str, script_path: str, thumbnail_path: str, subject: str | None, cfg: dict):
     """Étape 5 : upload et publication."""
     print("\n[5/5] Upload et publication...")
 
@@ -355,32 +410,39 @@ def upload_video(video_path: str, script_path: str, thumbnail_path: str, cfg: di
     upload_enabled = youtube_cfg.get("upload_enabled", False)
 
     if not upload_enabled:
-        print("  ⚠ Upload désactivé dans unified_config.yaml")
+        print("  ⚠ Upload désactivé (youtube.upload_enabled: false dans unified_config.yaml)")
         print(f"  → Vidéo prête : {video_path}")
         print(f"  → Script : {script_path}")
         print(f"  → Miniature : {thumbnail_path}")
         return
 
-    # Upload via TST
     tst_cfg = cfg.get("projects", {}).get("tst", {})
     tst_path = tst_cfg.get("path")
-
-    if not tst_path or not Path(tst_path).exists():
+    if not tst_path or not Path(tst_path).expanduser().exists():
         print(f"✗ TST non trouvé : {tst_path}")
         sys.exit(1)
+    tst_path = Path(tst_path).expanduser()
 
-    uploader_script = Path(tst_path) / "scripts" / "uploader.py"
-    if not uploader_script.exists():
-        print(f"✗ Uploader TST manquant : {uploader_script}")
-        sys.exit(1)
+    sys.path.insert(0, str(tst_path / "src"))
+    from uploader import upload_short
 
-    print(f"  → Upload via TST : {uploader_script}")
-    print("  ⚠ Upload non implémenté — à connecter avec uploader.py")
+    metadata = _load_or_generate_metadata(script_path, subject, cfg)
+    privacy = youtube_cfg.get("privacy_status", "private")
+
+    print(f"  → Upload via TST uploader.py (privacy={privacy})")
+    url = upload_short(
+        Path(video_path),
+        metadata,
+        privacy=privacy,
+        thumbnail_path=thumbnail_path,
+    )
+    print(f"✓ Vidéo uploadée : {url}")
 
     print(f"\n✓ Pipeline terminé !")
     print(f"  Vidéo : {video_path}")
     print(f"  Script : {script_path}")
     print(f"  Miniature : {thumbnail_path}")
+    print(f"  URL YouTube : {url}")
 
 
 def main():
@@ -430,7 +492,7 @@ def main():
     thumbnail_path = generate_thumbnail(video_path, args.subject, cfg)
 
     # Étape 5 : Upload
-    upload_video(video_path, script_path, thumbnail_path, cfg)
+    upload_video(video_path, script_path, thumbnail_path, args.subject, cfg)
 
     print("\n" + "=" * 60)
     print("✓ Pipeline terminé avec succès !")

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getPersonas, generateVideo, Persona, Video } from '@/lib/api';
+import { getPersonas, generateVideo, suggestSubject, Persona, Video, SubjectSuggestion } from '@/lib/api';
 
 export default function ProductionPage() {
   const [personas, setPersonas] = useState<Persona[]>([]);
@@ -11,6 +11,8 @@ export default function ProductionPage() {
   const [loading, setLoading] = useState(false);
   const [video, setVideo] = useState<Video | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestion, setSuggestion] = useState<SubjectSuggestion | null>(null);
 
   useEffect(() => {
     loadPersonas();
@@ -44,9 +46,25 @@ export default function ProductionPage() {
     }
   }
 
+  async function handleSuggestSubject() {
+    if (!selectedPersona) return;
+    setError(null);
+    try {
+      setSuggesting(true);
+      const result = await suggestSubject(selectedPersona);
+      setSubject(result.subject);
+      setSuggestion(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
   function handleReset() {
     setVideo(null);
     setSubject('');
+    setSuggestion(null);
     setError(null);
   }
 
@@ -109,20 +127,40 @@ export default function ProductionPage() {
 
           {/* Sujet */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Sujet de la vidéo <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium">
+                Sujet de la vidéo <span className="text-red-500">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={handleSuggestSubject}
+                disabled={suggesting || !selectedPersona}
+                className="text-xs px-3 py-1 rounded bg-primary-light border border-primary-light hover:border-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {suggesting ? '⏳ Analyse des tendances...' : '✨ Suggérer un sujet tendance'}
+              </button>
+            </div>
             <input
               type="text"
               required
               value={subject}
-              onChange={(e) => setSubject(e.target.value)}
+              onChange={(e) => {
+                setSubject(e.target.value);
+                setSuggestion(null);
+              }}
               placeholder="ex: Les 5 erreurs fatales en architecture .NET"
               className="w-full px-4 py-2 rounded bg-primary-light border border-primary-light focus:border-secondary focus:outline-none"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Suggestions: "Comment investir à 25 ans", "Pourquoi 90% des gens échouent", etc.
-            </p>
+            {suggestion ? (
+              <p className="text-xs text-secondary mt-1">
+                📈 Basé sur : {suggestion.based_on_trend || 'tendances actuelles'}
+                {suggestion.why_viral ? ` — ${suggestion.why_viral}` : ''}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">
+                Suggestions: "Comment investir à 25 ans", "Pourquoi 90% des gens échouent", etc.
+              </p>
+            )}
           </div>
 
           {/* Options */}

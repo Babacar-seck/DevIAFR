@@ -10,6 +10,7 @@ scripts dans le process de l'API).
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import uuid
@@ -20,12 +21,18 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 import db
-from models.schemas import Stats, VideoGenerateRequest, VideoInfo, VideoListItem
+from models.schemas import Stats, SubjectSuggestion, VideoGenerateRequest, VideoInfo, VideoListItem
 
 DEVIAFR_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = DEVIAFR_ROOT / "scripts"
 PERSONAS_DIR = DEVIAFR_ROOT / "config" / "personas"
 OUTPUT_DIR = DEVIAFR_ROOT / "storage" / "output"
+
+# Même pattern que PersonaBase.id dans models/schemas.py — un persona_id qui
+# ne matche pas ça ne peut de toute façon jamais correspondre à un persona
+# existant, donc le rejeter tôt bloque aussi la traversée de chemin
+# (ex. "../../../etc/passwd") avant qu'il n'atteigne PERSONAS_DIR / f"{...}.yaml".
+_PERSONA_ID_RE = re.compile(r"^[a-z0-9_]+$")
 
 SCRIPT_TIMEOUT_S = 180
 PRODUCTION_TIMEOUT_S = 600  # 10 minutes, cf. acceptation WEB-03
@@ -66,6 +73,30 @@ def _row_to_info(row: dict) -> VideoInfo:
         created_at=datetime.fromisoformat(row["created_at"]),
         duration_s=row.get("duration_s"),
     )
+
+
+@router.post("/suggest-subject", response_model=SubjectSuggestion)
+async def suggest_subject(persona_id: str):
+    """Suggère un sujet de vidéo optimisé viralité à partir des tendances réelles (Google Trends)."""
+    if not _PERSONA_ID_RE.match(persona_id):
+        raise HTTPException(status_code=400, detail="persona_id invalide")
+
+    persona_path = PERSONAS_DIR / f"{persona_id}.yaml"
+    if not persona_path.exists():
+        raise HTTPException(status_code=404, detail=f"Persona '{persona_id}' introuvable")
+
+    sys.path.insert(0, str(SCRIPTS_DIR))
+    from trend_analyzer import TrendAnalyzer
+
+    try:
+        result = TrendAnalyzer(persona_id).generate_ai_subject()
+    except (Exception, SystemExit) as exc:
+        # TrendAnalyzer._load_persona() fait sys.exit(1) si le persona est
+        # introuvable (SystemExit n'hérite pas d'Exception) — sans ce garde,
+        # ça tuerait le worker FastAPI au lieu de renvoyer une erreur HTTP.
+        raise HTTPException(status_code=502, detail=f"Échec génération du sujet : {exc}") from exc
+
+    return SubjectSuggestion(**result)
 
 
 @router.post("/generate", response_model=VideoInfo, status_code=201)
