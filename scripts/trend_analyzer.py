@@ -9,10 +9,15 @@ Usage:
 """
 
 import argparse
+import hashlib
 import json
+import os
+import re
 import sys
+import time
+import unicodedata
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 import requests
 from datetime import datetime, timedelta
 
@@ -20,6 +25,73 @@ from datetime import datetime, timedelta
 sys.path.insert(0, str(Path(__file__).parent))
 
 UNIFIED_CONFIG = Path(__file__).parent.parent / "config" / "unified_config.yaml"
+
+# Cache disque des réponses pytrends (anti-429 en usage répété).
+# Sous storage/temp/ (gitignoré) pour ne jamais polluer le repo.
+TREND_CACHE_PATH = Path(__file__).parent.parent / "storage" / "temp" / "trend_cache.json"
+TREND_CACHE_TTL = 6 * 3600  # 6h — une tendance "3 derniers mois" ne change pas à la seconde
+
+# Mots-outils français à exclure du découpage des topics composés.
+STOPWORDS = {
+    "pour", "les", "des", "avec", "une", "dans", "par", "sur", "et", "ou",
+    "vs", "de", "la", "le", "en", "au", "aux", "du", "ce", "cette", "ces",
+    "tout", "tous", "plus", "moins", "comment", "pourquoi", "avec",
+}
+
+
+def split_topic_keywords(topic: str) -> List[str]:
+    """Découpe un topic composé en mots-clés atomiques exploitables par pytrends.
+
+    Google Trends ne renvoie aucune requête associée pour des chaînes composées
+    (ex. ``".NET Core / ASP.NET"``), mais fonctionne sur un mot-clé simple.
+    Exemples :
+      ".NET Core / ASP.NET"                     → [".NET Core", "ASP.NET"]
+      "Angular / TypeScript"                    → ["Angular", "TypeScript"]
+      "IA pour devs (Claude, ChatGPT, Copilot)" → ["IA", "devs", "Claude", "ChatGPT", "Copilot"]
+      "DevOps / Docker / CI-CD"                 → ["DevOps", "Docker", "CI-CD"]
+      "Architecture logicielle"                 → ["Architecture logicielle"]
+    """
+    out: List[str] = []
+
+    # 1. Les items entre parenthèses sont des keywords indépendants
+    #    (ex. "(Claude, ChatGPT, Copilot)" → 3 keywords).
+    for m in re.findall(r"\(([^)]*)\)", topic):
+        for kw in re.split(r"[,/]", m):
+            kw = kw.strip()
+            if kw:
+                out.append(kw)
+
+    # 2. Segment principal sans parenthèses, découpé sur les séparateurs composés.
+    main = re.sub(r"\([^)]*\)", "", topic)
+    for seg in re.split(r"[/&]", main):
+        seg = seg.strip(" -–—·|")
+        if not seg:
+            continue
+        words = [w for w in re.split(r"\s+", seg) if w.lower() not in STOPWORDS]
+        if len(words) == len(re.split(r"\s+", seg)) and 1 <= len(words) <= 3:
+            # Phrase courte sans mot-outil → gardée entière (ex. "Architecture logicielle")
+            out.append(" ".join(words))
+        else:
+            # Phrase verbeuse (mot-outil détecté, ex. "IA pour devs") → mots atomiques
+            out.extend(words)
+
+    # Dédup insensible à la casse, en gardant l'ordre.
+    seen: set = set()
+    result: List[str] = []
+    for kw in out:
+        k = kw.lower()
+        if k not in seen and len(kw) >= 2:
+            seen.add(k)
+            result.append(kw)
+    return result
+
+
+def _normalize(s: str) -> str:
+    """Minuscules + suppression des accents (pour matcher des titres YouTube)."""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s.lower())
+        if unicodedata.category(c) != "Mn"
+    )
 
 
 def load_unified_config() -> Dict:
@@ -104,11 +176,68 @@ class TrendAnalyzer:
         
         return trending_topics[:max_results]
     
+    # ── Cache disque pytrends ────────────────────────────────────────────────
+    def _load_trend_cache(self) -> Dict:
+        try:
+            return json.loads(TREND_CACHE_PATH.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
+
+    def _save_trend_cache(self, cache: Dict):
+        try:
+            TREND_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            TREND_CACHE_PATH.write_text(
+                json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        except OSError as e:
+            print(f"  ⚠️  Impossible d'écrire le cache tendances : {e}")
+
+    def _pytrends_related_queries(
+        self, pytrends, keyword: str, timeframe: str = "today 3-m", geo: str = "FR",
+        max_retries: int = 3,
+    ) -> Optional[List[Dict]]:
+        """Appel pytrends avec backoff exponentiel + cache disque (anti-429).
+
+        pytrends scrape sans clé API officielle et renvoie des 429 en usage
+        répété à courte fenêtre : on retente avec backoff exponentiel, et on
+        met en cache 6h pour ne jamais redemander deux fois le même mot-clé.
+        """
+        cache_key = hashlib.sha1(f"{keyword}|{timeframe}|{geo}".encode("utf-8")).hexdigest()
+        cache = self._load_trend_cache()
+        hit = cache.get(cache_key)
+        if hit and hit.get("expires", 0) > time.time():
+            print(f"    ↻ Cache hit « {keyword} » ({len(hit['queries'])} requêtes, valide {TREND_CACHE_TTL // 3600}h)")
+            return hit["queries"]
+
+        for attempt in range(max_retries + 1):
+            try:
+                pytrends.build_payload([keyword], timeframe=timeframe, geo=geo)
+                related = pytrends.related_queries()
+                df = (related or {}).get(keyword, {}).get("top")
+                if df is None:
+                    return None  # pas de requête associée pour ce mot-clé
+                queries = [
+                    {"query": str(r["query"]), "value": int(r["value"])}
+                    for _, r in df.head(3).iterrows()
+                ]
+                cache[cache_key] = {"expires": time.time() + TREND_CACHE_TTL, "queries": queries}
+                self._save_trend_cache(cache)
+                return queries
+            except Exception as e:
+                if attempt < max_retries:
+                    sleep_s = 2 ** (attempt + 1)  # 2, 4, 8 s
+                    print(f"  ⏳ Erreur pytrends pour « {keyword} » — retry dans {sleep_s}s ({e})")
+                    time.sleep(sleep_s)
+                    continue
+                raise
+
     def analyze_google_trends(self, max_results: int = 10) -> List[Dict]:
         """
         Analyse Google Trends pour trouver des sujets populaires.
-        
-        Note: Utilise pytrends (librairie non-officielle).
+
+        Note: Utilise pytrends (librairie non-officielle). Les topics composés
+        du persona sont découpés en mots-clés atomiques avant l'appel, et les
+        réponses sont mises en cache 6h avec backoff exponentiel (anti-429).
         """
         print(f"📈 Analyse Google Trends pour {self.persona_id}...")
         
@@ -120,41 +249,41 @@ class TrendAnalyzer:
             subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pytrends"])
             from pytrends.request import TrendReq
         
-        # Extraire les keywords du persona
-        keywords = self.persona.get('content', {}).get('topics', [])[:5]
-        
-        if not keywords:
+        # Découper les topics composés du persona en mots-clés atomiques
+        topics = self.persona.get('content', {}).get('topics', [])
+        if not topics:
             print("⚠️  Aucun keyword défini dans le persona")
             return []
         
-        print(f"  🔑 Keywords: {', '.join(keywords)}")
+        keywords: List[str] = []
+        for topic in topics:
+            for kw in split_topic_keywords(topic):
+                if kw not in keywords:
+                    keywords.append(kw)
+        keywords = keywords[:8]  # borne les appels réseau (anti-429)
+        
+        print(f"  🔑 Mots-clés atomiques ({len(keywords)}): {', '.join(keywords)}")
         
         # Initialiser pytrends
         pytrends = TrendReq(hl='fr-FR', tz=360)
         
         trending_topics = []
         
-        # Analyser chaque keyword
+        # Analyser chaque mot-clé
         for keyword in keywords:
             try:
-                # Rechercher des requêtes liées
-                pytrends.build_payload([keyword], timeframe='today 3-m', geo='FR')
-                related_queries = pytrends.related_queries()
-                
-                if keyword in related_queries and related_queries[keyword]['top'] is not None:
-                    top_queries = related_queries[keyword]['top'].head(3)
-                    
-                    for _, row in top_queries.iterrows():
-                        query = row['query']
-                        value = row['value']
-                        
-                        trending_topics.append({
-                            'title': f"{query}: Le guide complet",
-                            'topic': keyword,
-                            'trend_score': min(100, value),
-                            'source': 'google_trends',
-                            'query': query
-                        })
+                top_queries = self._pytrends_related_queries(pytrends, keyword)
+                if not top_queries:
+                    continue
+                for item in top_queries:
+                    query, value = item["query"], item["value"]
+                    trending_topics.append({
+                        'title': f"{query}: Le guide complet",
+                        'topic': keyword,
+                        'trend_score': min(100, value),
+                        'source': 'google_trends',
+                        'query': query
+                    })
             except Exception as e:
                 print(f"  ⚠️  Erreur pour {keyword}: {e}")
                 continue
@@ -162,6 +291,69 @@ class TrendAnalyzer:
         # Trier par score de tendance
         trending_topics.sort(key=lambda x: x['trend_score'], reverse=True)
         
+        return trending_topics[:max_results]
+    
+    def analyze_youtube_data_api(self, max_results: int = 5) -> List[Dict]:
+        """Tendances réelles via YouTube Data API v3 (source alternative à pytrends).
+
+        Activée uniquement si une clé est configurée :
+          - `youtube.api_key` dans config/unified_config.yaml, ou
+          - variable d'environnement `YOUTUBE_API_KEY`.
+        Sans clé, retourne [] (la chaîne de repli reste le persona).
+        Utilise `videos.list(chart=mostPopular)` (France) filtré par la catégorie
+        du persona et par correspondance des mots-clés dans les titres.
+        """
+        cfg = load_unified_config()
+        api_key = (cfg.get("youtube", {}).get("api_key") or "").strip() or os.environ.get("YOUTUBE_API_KEY", "").strip()
+        if not api_key:
+            print("  ⚠️  YouTube Data API : pas de clé configurée (youtube.api_key / YOUTUBE_API_KEY) — source ignorée")
+            return []
+
+        print(f"📺 Analyse YouTube Data API pour {self.persona_id}...")
+
+        topics = self.persona.get('content', {}).get('topics', [])
+        keywords = [split_topic_keywords(t) for t in topics]
+        flat = [kw for sub in keywords for kw in sub]
+        if not flat:
+            return []
+
+        category_id = cfg.get("youtube", {}).get("category_id", "28")
+        url = "https://www.googleapis.com/youtube/v3/videos"
+        params = {
+            "part": "snippet,statistics",
+            "chart": "mostPopular",
+            "regionCode": "FR",
+            "videoCategoryId": category_id,
+            "maxResults": 50,
+            "key": api_key,
+        }
+        try:
+            resp = requests.get(url, params=params, timeout=15)
+            resp.raise_for_status()
+            items = resp.json().get("items", [])
+        except Exception as e:
+            print(f"  ⚠️  Erreur YouTube Data API : {e}")
+            return []
+
+        trending_topics = []
+        for item in items:
+            title = item.get("snippet", {}).get("title", "")
+            title_norm = _normalize(title)
+            match = next((kw for kw in flat if _normalize(kw) in title_norm), None)
+            if not match:
+                continue
+            views = int(item.get("statistics", {}).get("viewCount", 0) or 0)
+            score = min(100, 5 + round(10 * (views ** 0.25)))  # échelle log, plafonné à 100
+            trending_topics.append({
+                'title': f"{title}: Le guide complet",
+                'topic': match,
+                'trend_score': score,
+                'source': 'youtube_data_api',
+                'query': title,
+            })
+
+        trending_topics.sort(key=lambda x: x['trend_score'], reverse=True)
+        print(f"  ✓ {len(trending_topics)} tendances YouTube réelles ({len(flat)} mots-clés scrutés)")
         return trending_topics[:max_results]
     
     def generate_video_ideas(self, count: int = 10) -> List[Dict]:
@@ -198,15 +390,18 @@ class TrendAnalyzer:
     def generate_ai_subject(self) -> Dict:
         """Synthétise UN sujet de vidéo optimisé viralité à partir des tendances réelles.
 
-        analyze_youtube_trends() ne fait que décliner les topics du persona en
-        variations de titres (score simulé), donc le signal de tendance réel
-        vient d'analyze_google_trends() (pytrends). On ne retombe sur le
-        générateur de variations que si Google Trends n'a rien renvoyé
+        Le signal de tendance réel vient d'abord d'analyze_google_trends()
+        (pytrends, mots-clés atomiques + cache/backoff), puis de la YouTube
+        Data API si une clé est configurée, et on ne retombe sur le générateur
+        de variations du persona que si aucune source réelle n'a rien renvoyé
         (indisponible / clé absente), pour ne jamais renvoyer un sujet vide.
         """
         trends = self.analyze_google_trends(max_results=8)
         if not trends:
-            print("  ⚠ Google Trends indisponible — repli sur les topics du persona")
+            print("  ⚠ Google Trends indisponible — tentative YouTube Data API")
+            trends = self.analyze_youtube_data_api(max_results=8)
+        if not trends:
+            print("  ⚠ Aucune source réelle — repli sur les topics du persona")
             trends = self.analyze_youtube_trends(max_results=8)
         if not trends:
             raise RuntimeError("Aucun signal de tendance disponible (persona sans topics ni Google Trends)")
@@ -225,7 +420,7 @@ class TrendAnalyzer:
 Niche de la chaîne : {niche}
 Ton de la chaîne : {tone}
 
-Voici des tendances réelles du moment (Google Trends, France, 3 derniers mois) liées à cette niche :
+Voici des tendances réelles du moment (Google Trends / YouTube, France, 3 derniers mois) liées à cette niche :
 {signals}
 
 À partir de CES tendances réelles, invente UN SEUL sujet de vidéo Short (60s) avec le maximum de chances de devenir viral : accrocheur, formulé comme un titre YouTube percutant (pas une question plate), qui exploite une tendance actuelle.

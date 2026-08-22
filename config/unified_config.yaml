@@ -252,11 +252,15 @@ encoding:
 youtube:
   upload_enabled: false               # ⚠️ Opt-in explicite — passer à true pour activer l'upload réel via TST
   category_id: "28"
-  privacy_status: "public"
+  privacy_status: "private"           # ⚠️ Anti-ban : jamais "public" sans revue humaine (cf. CLAUDE.md). Reste "private" par défaut même si upload_enabled passe à true.
   made_for_kids: false
   description_min_words: 200
   tags_max: 15
   tags_max_chars: 500
+  # Clé YouTube Data API v3 (optionnelle) — source de tendances réelles
+  # alternative quand pytrends est indisponible/429 (trend_analyzer.py).
+  # Alternative : variable d'environnement YOUTUBE_API_KEY. Ne pas committer de vraie clé ici.
+  api_key: ""
   # Scheduler (heures de Paris)
   schedule:
     long_form:
