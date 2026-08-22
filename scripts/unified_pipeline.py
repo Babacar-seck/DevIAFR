@@ -166,6 +166,11 @@ def produce_video_mpt(script_path: str, subject: str, cfg: dict, narration_path:
     # Paramètres vidéo depuis unified_config
     visual_cfg = cfg.get("visual", {})
     subtitles_cfg = cfg.get("subtitles", {})
+    # Le style de sous-titres vit sous subtitles.style.* dans le vrai schéma
+    # (voir config/unified_config.yaml) — pas directement sous subtitles.* —
+    # donc ces champs retombaient tous silencieusement sur leurs défauts codés
+    # en dur, y compris une police ("Arial-Bold.ttf") absente des fonts MPT.
+    style_cfg = subtitles_cfg.get("style", {})
 
     payload = {
         "video_subject": subject,
@@ -175,12 +180,12 @@ def produce_video_mpt(script_path: str, subject: str, cfg: dict, narration_path:
         "video_transition_mode": visual_cfg.get("transition_mode", "shuffle"),
         "enable_bgm": True,
         "bgm_volume": visual_cfg.get("bgm_volume", 0.2),
-        "font_name": subtitles_cfg.get("font_name", "Arial-Bold.ttf"),
-        "text_fore_color": subtitles_cfg.get("text_fore_color", "#FFFFFF"),
-        "text_back_color": subtitles_cfg.get("text_back_color", "#00000080"),
-        "font_size": subtitles_cfg.get("font_size", 50),
-        "stroke_color": subtitles_cfg.get("stroke_color", "#000000"),
-        "stroke_width": subtitles_cfg.get("stroke_width", 1.5),
+        "font_name": style_cfg.get("font_name", "Charm-Bold.ttf"),
+        "text_fore_color": style_cfg.get("text_color", "#FFFFFF"),
+        "text_back_color": "#00000080",  # pas d'équivalent dans subtitles.style.*
+        "font_size": style_cfg.get("font_size", 50),
+        "stroke_color": style_cfg.get("stroke_color", "#000000"),
+        "stroke_width": style_cfg.get("stroke_width", 1.5),
     }
     if narration_path:
         # Chemin absolu serveur : MPT accepte tout fichier existant hors de son
