@@ -177,7 +177,7 @@ subtitles:
     model_path: "storage/models/whisper-large-v3"
   # Style burn-in
   style:
-    font_name: "Arial-Bold.ttf"
+    font_name: "Charm-Bold.ttf"
     font_size: 50
     text_color: "#ffffff"
     stroke_color: "#000000"

@@ -204,29 +204,51 @@ def produce_video_mpt(script_path: str, subject: str, cfg: dict, narration_path:
         )
 
         if response.status_code == 200:
-            result = response.json()
-            task_id = result.get("task_id", "unknown")
+            # MPT enveloppe toutes ses réponses dans {"status":.., "data":..}
+            # (app/utils/utils.py::get_response) — task_id est sous data, pas
+            # à la racine.
+            task_id = response.json().get("data", {}).get("task_id", "unknown")
             print(f"✓ Tâche MPT créée : {task_id}")
 
-            # Poll pour attendre la fin
+            # Poll pour attendre la fin. La route de statut réelle de MPT est
+            # GET /api/v1/tasks/{task_id} (pas /api/v1/videos/{id}/status),
+            # et l'état est un int (app/models/const.py :
+            # TASK_STATE_FAILED=-1, TASK_STATE_COMPLETE=1), pas une string.
             print("  → Attente de la production...")
-            status_url = f"{mpt_url}/api/v1/videos/{task_id}/status"
+            status_url = f"{mpt_url}/api/v1/tasks/{task_id}"
+            TASK_STATE_FAILED, TASK_STATE_COMPLETE = -1, 1
             for _ in range(60):  # 5 minutes max
                 time.sleep(5)
                 status_resp = requests.get(status_url, timeout=30)
                 if status_resp.status_code == 200:
-                    status_data = status_resp.json()
-                    status = status_data.get("status")
-                    if status == "completed":
-                        video_path = status_data.get("video_path")
-                        print(f"✓ Vidéo produite : {video_path}")
-                        return video_path
-                    elif status == "failed":
-                        error = status_data.get("error", "Unknown error")
+                    task_data = status_resp.json().get("data", {})
+                    state = task_data.get("state")
+                    if state == TASK_STATE_COMPLETE:
+                        videos = task_data.get("videos") or []
+                        if not videos:
+                            print("✗ Tâche complétée mais aucune vidéo produite")
+                            sys.exit(1)
+                        # videos[i] est une URI type "/tasks/{task_id}/final-1.mp4"
+                        # (app/controllers/v1/video.py::_task_file_to_uri, avec
+                        # endpoint="" dans ce déploiement) — pas un chemin local
+                        # ni une URL absolue. Le fichier vit sur le process MPT,
+                        # potentiellement une autre machine ; on le rapatrie via
+                        # /api/v1/download/{path relatif à tasks_dir}.
+                        relative_path = videos[0].removeprefix("/tasks/")
+                        video_bytes = requests.get(
+                            f"{mpt_url}/api/v1/download/{relative_path}", timeout=mpt_timeout
+                        ).content
+                        local_video_path = OUTPUT_DIR / f"video_{task_id}.mp4"
+                        local_video_path.parent.mkdir(parents=True, exist_ok=True)
+                        local_video_path.write_bytes(video_bytes)
+                        print(f"✓ Vidéo produite : {local_video_path}")
+                        return str(local_video_path)
+                    elif state == TASK_STATE_FAILED:
+                        error = task_data.get("error", "Unknown error")
                         print(f"✗ Production échouée : {error}")
                         sys.exit(1)
                     else:
-                        print(f"    Status : {status}...")
+                        print(f"    État : {state}...")
                 else:
                     print(f"    Poll error : {status_resp.status_code}")
 
