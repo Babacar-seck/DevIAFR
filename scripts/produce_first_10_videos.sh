@@ -96,7 +96,7 @@ for i in "${!SUBJECTS[@]}"; do
     # Étape 4 : Color grading
     echo "🎨 Étape 4/7 : Color grading (LUT)"
     if [[ -f "$VIDEO_DIR/video.mp4" ]]; then
-        $PYTHON scripts/color_grade.py --input "$VIDEO_DIR/video.mp4" --output "$VIDEO_DIR/video_graded.mp4" --channel dev_ia_fr
+        $PYTHON scripts/color_grading.py --input "$VIDEO_DIR/video.mp4" --output "$VIDEO_DIR/video_graded.mp4"
         mv "$VIDEO_DIR/video_graded.mp4" "$VIDEO_DIR/video.mp4"
     fi
     echo ""
@@ -139,7 +139,7 @@ echo "============================================================"
 echo ""
 echo "Prochaines étapes :"
 echo "  1. Upload YouTube : utiliser TST uploader.py ou MPT upload_post.py"
-echo "  2. Cross-platform : python scripts/cross_platform.py --video ... --title ..."
+echo "  2. Cross-platform : python scripts/cross_publish.py --video ... --title ..."
 echo "  3. Repurposing : python scripts/repurpose.py --input video_long.mp4 --output-dir clips/"
 echo "  4. Analytics : python scripts/analytics_loop.py --channel dev_ia_fr"
 echo ""

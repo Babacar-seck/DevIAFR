@@ -50,10 +50,10 @@ python main.py --config ~/MyWorkDirectory/DevIAFR/config/active_config.yaml
 
 # 4. Post-processing
 cd ~/MyWorkDirectory/DevIAFR
-python scripts/color_grade.py --input output/video.mp4 --output output/graded.mp4 --persona motivation_fr
+python scripts/color_grading.py --input output/video.mp4 --output output/graded.mp4
 python scripts/quality_score.py --video output/graded.mp4 --script storage/scripts/motivation_script.txt
 python scripts/human_review.py --video output/graded.mp4 --script storage/scripts/motivation_script.txt
-python scripts/cross_platform.py --video output/graded.mp4 --script storage/scripts/motivation_script.txt
+python scripts/cross_publish.py --video output/graded.mp4 --title "Ta dose quotidienne de motivation"
 ```
 
 ## Créer un nouveau persona

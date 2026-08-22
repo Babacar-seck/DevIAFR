@@ -316,10 +316,9 @@ run_pipeline() {
     # Color grading
     if [ -f "$video_file" ]; then
         log_info "Application du color grading..."
-        $MPT_PYTHON "$SCRIPT_DIR/color_grade.py" \
+        $MPT_PYTHON "$SCRIPT_DIR/color_grading.py" \
             --input "$video_file" \
-            --output "${video_file%.mp4}_graded.mp4" \
-            --persona "$PERSONA"
+            --output "${video_file%.mp4}_graded.mp4"
         
         # Quality score
         log_info "Calcul du score qualité..."

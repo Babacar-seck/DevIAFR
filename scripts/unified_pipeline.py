@@ -40,13 +40,14 @@ def load_config() -> dict:
 def generate_script(subject: str, cfg: dict) -> str:
     """Étape 1 : génère (TST) puis humanise (humanize_script.py) le script.
 
-    Le script est un JSON structuré (title/hook/body/cta/hashtags/description)
-    — pas du texte brut — pour que la miniature puisse en extraire un titre
-    court et que MPT reçoive une narration aplatie (voir produce_video_mpt).
+    humanize_script() retourne du texte brut (prose LLM structurée par le
+    prompt storytelling), pas un objet JSON — on le sauvegarde tel quel en
+    .txt, comme le fait humanize_script.py::main() et comme le lit
+    api/routers/videos.py (script.txt).
     """
     print("\n[1/5] Génération du script humanisé...")
 
-    script_output = SCRIPT_DIR / "output" / f"script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    script_output = SCRIPT_DIR / "output" / f"script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
     script_output.parent.mkdir(parents=True, exist_ok=True)
 
     tst_path = Path(cfg["projects"]["tst"]["path"]).expanduser()
@@ -57,15 +58,93 @@ def generate_script(subject: str, cfg: dict) -> str:
     from humanize_script import humanize_script
 
     brut = tst_generate_script(topic=subject, format_type="top5", content_profile="ai_tech")
-    humanized = humanize_script(brut, cfg)
+    humanized = humanize_script(brut, subject, cfg)
 
-    script_output.write_text(json.dumps(humanized, ensure_ascii=False, indent=2))
+    script_output.write_text(humanized, encoding="utf-8")
     print(f"✓ Script humanisé : {script_output}")
 
     return str(script_output)
 
 
-def produce_video_mpt(script_path: str, subject: str, cfg: dict) -> str:
+def _extract_narration_text(script_path: str) -> str:
+    """Extrait le texte de narration d'un fichier script (JSON structuré ou texte brut)."""
+    content = Path(script_path).read_text(encoding="utf-8").strip()
+    try:
+        data = json.loads(content)
+    except (json.JSONDecodeError, TypeError):
+        return content
+    if isinstance(data, dict):
+        parts = [str(data[key]) for key in ("hook", "body", "cta") if data.get(key)]
+        if parts:
+            return "\n\n".join(parts)
+    return content
+
+
+def generate_narration_rtvc(script_path: str, channel: str, cfg: dict) -> str | None:
+    """Étape 1.5 : synthétise la narration localement via RTVC (voix du persona).
+
+    Optionnelle : retourne None (et laisse MPT utiliser sa propre TTS) si
+    tts.engine != "rtvc", si le persona n'a pas de voice_sample, ou si RTVC
+    n'est pas disponible. Ne bloque jamais la production vidéo.
+    """
+    print("\n[1.5/5] Génération de la narration (RTVC)...")
+
+    tts_cfg = cfg.get("tts", {})
+    if tts_cfg.get("engine") != "rtvc":
+        print("  ⚠ tts.engine != 'rtvc' dans unified_config.yaml — narration RTVC ignorée")
+        return None
+
+    persona_path = DEVIAFR_ROOT / "config" / "personas" / f"{channel}.yaml"
+    if not persona_path.exists():
+        print(f"  ⚠ Persona introuvable ({persona_path}) — narration RTVC ignorée")
+        return None
+    with open(persona_path, encoding="utf-8") as f:
+        persona_cfg = yaml.safe_load(f) or {}
+
+    voice_sample_rel = (persona_cfg.get("voice") or {}).get("voice_sample")
+    if not voice_sample_rel:
+        print(f"  ⚠ Aucune voice_sample définie pour '{channel}' — narration RTVC ignorée")
+        return None
+    voice_ref = DEVIAFR_ROOT / "storage" / voice_sample_rel
+    if not voice_ref.exists():
+        print(f"  ⚠ Référence vocale introuvable : {voice_ref} — narration RTVC ignorée")
+        return None
+
+    narration_text = _extract_narration_text(script_path)
+    if not narration_text:
+        print("  ⚠ Script vide — narration RTVC ignorée")
+        return None
+
+    rtvc_venv_python = Path(
+        tts_cfg.get("rtvc", {}).get(
+            "venv_python", "~/MyWorkProjectGithub/Real-Time-Voice-Cloning/.venv/bin/python"
+        )
+    ).expanduser()
+    if not rtvc_venv_python.exists():
+        print(f"  ⚠ Python RTVC introuvable : {rtvc_venv_python} — narration RTVC ignorée")
+        return None
+
+    narration_path = OUTPUT_DIR / f"narration_{channel}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
+    narration_path.parent.mkdir(parents=True, exist_ok=True)
+
+    proc = subprocess.run(
+        [str(rtvc_venv_python), str(SCRIPT_DIR / "voice_clone_rtvc.py"),
+         "--voice-ref", str(voice_ref),
+         "--text", narration_text,
+         "--output", str(narration_path)],
+        cwd=str(DEVIAFR_ROOT),
+        capture_output=True, text=True, timeout=600,
+    )
+    if proc.returncode != 0 or not narration_path.exists():
+        error = (proc.stderr or proc.stdout or "erreur inconnue")[-500:]
+        print(f"  ✗ Échec narration RTVC (fallback TTS MPT) : {error}")
+        return None
+
+    print(f"  ✓ Narration RTVC : {narration_path}")
+    return str(narration_path)
+
+
+def produce_video_mpt(script_path: str, subject: str, cfg: dict, narration_path: str | None = None) -> str:
     """Étape 2 : produit la vidéo via MPT API."""
     print("\n[2/5] Production vidéo via MPT...")
 
@@ -95,10 +174,19 @@ def produce_video_mpt(script_path: str, subject: str, cfg: dict) -> str:
         "stroke_color": subtitles_cfg.get("stroke_color", "#000000"),
         "stroke_width": subtitles_cfg.get("stroke_width", 1.5),
     }
+    if narration_path:
+        # Chemin absolu serveur : MPT accepte tout fichier existant hors de son
+        # task_dir tant qu'il est fourni en chemin absolu (cf.
+        # resolve_custom_audio_file dans MPT/app/services/task.py). Cela
+        # court-circuite la TTS interne de MPT et utilise Whisper pour les
+        # sous-titres, comme documenté sur VideoParams.custom_audio_file.
+        payload["custom_audio_file"] = narration_path
 
     print(f"  → Appel MPT API : {mpt_url}/api/v1/videos")
     print(f"  → Sujet : {subject}")
     print(f"  → Aspect : {payload['video_aspect']}")
+    if narration_path:
+        print(f"  → Narration custom (RTVC) : {narration_path}")
 
     try:
         response = requests.post(
@@ -152,47 +240,40 @@ def produce_video_mpt(script_path: str, subject: str, cfg: dict) -> str:
 
 
 def post_process_sfx(video_path: str, cfg: dict) -> str:
-    """Étape 3 : ajoute les effets sonores (SFX)."""
+    """Étape 3 : ajoute les effets sonores (SFX) via sfx_designer.py.
+
+    sfx_designer.apply_sound_design() détecte les coupures de scène, y place
+    un whoosh (fondu inclus) et applique un ducking sidechain sur la BGM si
+    une piste est fournie. La bibliothèque SFX est synthétisée
+    procéduralement (pas de fichiers externes requis).
+    """
     print("\n[3/5] Post-processing : SFX...")
 
     sound_cfg = cfg.get("sound_design", {})
-    sfx_enabled = sound_cfg.get("sfx_enabled", True)
-
-    if not sfx_enabled:
-        print("  ⚠ SFX désactivé dans unified_config.yaml")
+    if not sound_cfg.get("enabled", True):
+        print("  ⚠ Sound design désactivé dans unified_config.yaml (sound_design.enabled)")
         return video_path
 
-    sfx_dir = DEVIAFR_ROOT / "storage" / "sfx"
-    if not sfx_dir.exists():
-        print(f"  ⚠ Dossier SFX manquant : {sfx_dir}")
-        print("  → Création du dossier vide")
-        sfx_dir.mkdir(parents=True, exist_ok=True)
-        return video_path
-
-    # Cherche des fichiers SFX
-    sfx_files = list(sfx_dir.glob("*.wav")) + list(sfx_dir.glob("*.mp3"))
-    if not sfx_files:
-        print(f"  ⚠ Aucun fichier SFX trouvé dans {sfx_dir}")
-        print("  → Ajoute des fichiers .wav ou .mp3 (ex: whoosh.wav, impact.wav)")
-        return video_path
-
-    # Logique simple : ajoute un whoosh toutes les 10 secondes
-    output_path = Path(video_path).with_name(f"{Path(video_path).stem}_sfx.mp4")
-
-    # Vérifier que le fichier vidéo existe
     if not Path(video_path).exists():
         print(f"  ⚠ Fichier vidéo inexistant : {video_path}")
         print("  → Skip SFX (mode test ou fichier manquant)")
         return video_path
 
-    # FFMPEG : mix audio avec SFX
-    # Pour l'instant, on copie sans modification (placeholder)
-    print("  → Application SFX (placeholder — à implémenter)")
-    subprocess.run([
-        "ffmpeg", "-y", "-i", video_path,
-        "-c", "copy",
-        str(output_path)
-    ], check=True, capture_output=True)
+    sys.path.insert(0, str(SCRIPT_DIR))
+    from sfx_designer import apply_sound_design
+
+    output_path = Path(video_path).with_name(f"{Path(video_path).stem}_sfx.mp4")
+
+    # Pas de source BGM concrète configurée pour l'instant (sound_design.bgm.type
+    # reste "random" sans chemin de fichier réel) — apply_sound_design() gère
+    # bgm_path=None en sautant simplement le ducking.
+    bgm_path = None
+
+    try:
+        apply_sound_design(Path(video_path), output_path, cfg, bgm_path=bgm_path)
+    except subprocess.CalledProcessError as exc:
+        print(f"  ✗ Échec sound design (fallback vidéo sans SFX) : {exc}")
+        return video_path
 
     print(f"✓ Vidéo avec SFX : {output_path}")
     return str(output_path)
@@ -339,7 +420,8 @@ def main():
         video_path = args.video
         print(f"\n✓ Vidéo fournie (skip MPT) : {video_path}")
     else:
-        video_path = produce_video_mpt(script_path, args.subject, cfg)
+        narration_path = generate_narration_rtvc(script_path, args.channel, cfg)
+        video_path = produce_video_mpt(script_path, args.subject, cfg, narration_path=narration_path)
 
     # Étape 3 : Post-processing SFX
     video_path = post_process_sfx(video_path, cfg)

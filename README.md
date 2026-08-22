@@ -22,11 +22,11 @@ DevIAFR/
 │   ├── unified_pipeline.py      # Pipeline principal unifié
 │   ├── whisper_subtitles.py     # Sous-titres Whisper large-v3
 │   ├── sfx_designer.py          # Sound design (SFX + ducking)
-│   ├── color_grade.py           # Color grading (LUT)
+│   ├── color_grading.py           # Color grading (LUT)
 │   ├── intro_outro.py           # Intro/outro animés
 │   ├── quality_score.py         # Score qualité (0-100)
 │   ├── human_review.py          # Revue humaine obligatoire
-│   ├── cross_platform.py        # Publication multi-plateforme
+│   ├── cross_publish.py        # Publication multi-plateforme
 │   ├── repurpose.py             # Repurposing (long→shorts)
 │   ├── analytics_loop.py        # Analytics + apprentissage
 │   └── produce_first_10_videos.sh  # Script de production initial
@@ -119,10 +119,9 @@ python scripts/sfx_designer.py \
   --ducking
 
 # Color grading
-python scripts/color_grade.py \
+python scripts/color_grading.py \
   --input storage/output/video_sfx.mp4 \
-  --output storage/output/video_graded.mp4 \
-  --channel dev_ia_fr
+  --output storage/output/video_graded.mp4
 
 # Intro/Outro
 python scripts/intro_outro.py \
@@ -157,17 +156,16 @@ python scripts/human_review.py \
 ### Publication multi-plateforme
 
 ```bash
-# YouTube + TikTok + Instagram
-python scripts/cross_platform.py \
+# TikTok + Instagram
+python scripts/cross_publish.py \
   --video storage/output/video_final.mp4 \
-  --title "Comment créer une API REST .NET" \
-  --channel dev_ia_fr
+  --title "Comment créer une API REST .NET"
 
-# YouTube uniquement
-python scripts/cross_platform.py \
+# TikTok uniquement
+python scripts/cross_publish.py \
   --video storage/output/video_final.mp4 \
   --title "Comment créer une API REST .NET" \
-  --tiktok-only
+  --platforms tiktok
 ```
 
 ### Repurposing (long → shorts)
@@ -180,10 +178,10 @@ python scripts/repurpose.py \
 
 # Publier les clips sur TikTok/Reels
 for clip in storage/output/clips/clip_*.mp4; do
-  python scripts/cross_platform.py \
+  python scripts/cross_publish.py \
     --video "$clip" \
     --title "Extrait : API REST .NET" \
-    --tiktok-only
+    --platforms tiktok
 done
 ```
 
@@ -218,7 +216,7 @@ python scripts/analytics_loop.py --channel dev_ia_fr
 │ 3. POST-PROCESSING (TST)                                    │
 │    whisper_subtitles.py → sous-titres précis                │
 │    sfx_designer.py → effets sonores + ducking               │
-│    color_grade.py → color grading (LUT)                     │
+│    color_grading.py → color grading (LUT)                     │
 │    intro_outro.py → branding                                │
 └────────────────────┬────────────────────────────────────────┘
                      │
@@ -233,7 +231,7 @@ python scripts/analytics_loop.py --channel dev_ia_fr
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 5. PUBLICATION                                              │
-│    cross_platform.py → YouTube + TikTok + Instagram         │
+│    cross_publish.py → YouTube + TikTok + Instagram         │
 │    repurpose.py → clips courts                              │
 └────────────────────┬────────────────────────────────────────┘
                      │
@@ -360,7 +358,7 @@ cd ~/MyWorkProjectGithub/MoneyPrinterTurbo
 1. **Configurer ElevenLabs** : Créer la voix custom "TechDev FR"
 2. **Tester le pipeline** : `./scripts/produce_first_10_videos.sh --dry-run`
 3. **Produire la première vidéo** : Suivre le workflow manuel étape par étape
-4. **Publier** : `python scripts/cross_platform.py --video ... --title ...`
+4. **Publier** : `python scripts/cross_publish.py --video ... --title ...`
 5. **Analyser** : `python scripts/analytics_loop.py --channel dev_ia_fr`
 6. **Itérer** : Ajuster les scripts basé sur les analytics
 

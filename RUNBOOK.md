@@ -173,7 +173,7 @@ python scripts/humanize_script.py --subject "Sujet vidéo" --output storage/scri
 python scripts/unified_pipeline.py --script storage/scripts/script.txt
 
 # 4. Post-processing
-python scripts/color_grade.py --input output/video.mp4 --output output/graded.mp4
+python scripts/color_grading.py --input output/video.mp4 --output output/graded.mp4
 python scripts/quality_score.py --video output/graded.mp4 --script storage/scripts/script.txt
 
 # 5. Upload (optionnel)
@@ -284,13 +284,13 @@ DevIAFR/
 │   ├── select_persona.py       # Sélection de persona
 │   ├── humanize_script.py      # Humanisation + storytelling
 │   ├── unified_pipeline.py     # Pipeline de production
-│   ├── color_grade.py          # Color grading
+│   ├── color_grading.py        # Color grading
 │   ├── quality_score.py        # Score qualité
 │   ├── intro_outro.py          # Ajout intro/outro
 │   ├── sfx_designer.py         # Design sonore
 │   ├── whisper_subtitles.py    # Sous-titres auto
 │   ├── repurpose.py            # Repurposing (long → shorts)
-│   ├── cross_platform.py       # Multi-plateforme
+│   ├── cross_publish.py        # Multi-plateforme
 │   ├── analytics_loop.py       # Analytics feedback
 │   └── youtube_uploader.py     # Upload YouTube
 │
@@ -373,7 +373,7 @@ llm:
 
 3. Activer le color grading :
 ```bash
-python scripts/color_grade.py --input video.mp4 --output graded.mp4 --preset cinematic
+python scripts/color_grading.py --input video.mp4 --output graded.mp4
 ```
 
 ### MPT ne démarre pas
