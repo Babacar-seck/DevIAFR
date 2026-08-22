@@ -204,6 +204,7 @@ async def list_videos(limit: int = 50):
             status=row["status"],
             quality_score=row.get("quality_score"),
             created_at=datetime.fromisoformat(row["created_at"]),
+            has_video=bool(row.get("video_path")),
         )
         for row in rows
     ]

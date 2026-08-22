@@ -121,6 +121,7 @@ class VideoListItem(BaseModel):
     status: str
     quality_score: Optional[int] = None
     created_at: datetime
+    has_video: bool = False
 
 
 class Stats(BaseModel):

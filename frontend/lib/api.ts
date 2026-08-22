@@ -37,6 +37,7 @@ export interface Video {
   script_content?: string;
   error?: string;
   created_at: string;
+  has_video?: boolean;
 }
 
 export interface SubjectSuggestion {

@@ -67,7 +67,7 @@ export default function VideoTable({ videos, onDownload, onDelete }: VideoTableP
               </td>
               <td className="py-3 px-4 text-right">
                 <div className="flex gap-2 justify-end">
-                  {video.status === 'ready' && (
+                  {video.status === 'ready' && video.has_video && (
                     <button
                       onClick={() => onDownload(video.id)}
                       className="px-3 py-1 rounded bg-secondary text-primary-dark hover:bg-secondary-light transition-colors text-sm"
