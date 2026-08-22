@@ -250,7 +250,7 @@ encoding:
 
 # ── YouTube Upload ───────────────────────────────────────────────────────────
 youtube:
-  upload_enabled: false               # ⚠️ Opt-in explicite — passer à true pour activer l'upload réel via TST
+  upload_enabled: true                # ⚠️ Opt-in explicite — passer à true pour activer l'upload réel via TST
   category_id: "28"
   privacy_status: "private"           # ⚠️ Anti-ban : jamais "public" sans revue humaine (cf. CLAUDE.md). Reste "private" par défaut même si upload_enabled passe à true.
   made_for_kids: false
