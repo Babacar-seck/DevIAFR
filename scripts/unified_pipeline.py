@@ -429,6 +429,81 @@ Retourne UNIQUEMENT un JSON valide avec cette structure :
     return metadata
 
 
+def _preflight_upload(cfg: dict) -> None:
+    """Échoue VITE (avant tout calcul) si l'upload est activé mais impossible.
+
+    Sans ce garde, une génération réelle avec `youtube.upload_enabled: true`
+    plantait à la TOUTE dernière étape — `ModuleNotFoundError: No module named
+    'google'` dans upload_video() — après ~10 min de calcul (script, narration,
+    rendu MPT, SFX, miniature) gaspillées. Exemple réel : requête
+    coran_lumiere_fr du 2026-08-22 17:38 via l'API.
+
+    Vérifie : 1) les dépendances OAuth Google de TST dans l'environnement qui
+    exécute le pipeline, 2) la présence d'un compte YouTube connecté
+    (token.json côté TST ou connexion en base). En cas d'échec → sys.exit(1)
+    immédiat avec un message actionnable (le subprocess de l'API capture le
+    returncode et marque la vidéo "failed" en quelques secondes).
+    """
+    youtube_cfg = cfg.get("youtube", {})
+    if not youtube_cfg.get("upload_enabled", False):
+        return
+
+    print("  ⏳ Pré-vol upload : vérification de l'environnement OAuth...")
+
+    # 1. Dépendances OAuth Google (importées par uploader.py de TST)
+    missing = [m for m in ("google.auth", "googleapiclient", "google_auth_oauthlib")
+               if not _importable(m)]
+    if missing:
+        print("✗ Upload activé (youtube.upload_enabled: true) mais dépendances OAuth absentes de cet environnement :")
+        print(f"    {' '.join(missing)}")
+        print("  → Installe-les dans l'environnement qui exécute le pipeline (api/.venv pour l'API) :")
+        print("      api/.venv/bin/pip install google-auth-oauthlib google-api-python-client")
+        print("  → Ou repasse youtube.upload_enabled à false si l'upload n'est pas prévu.")
+        sys.exit(1)
+
+    # 2. Compte YouTube connecté (token.json côté TST, ou connexion en base).
+    #    IMPORTANT : vérification en stdlib uniquement (sqlite3 en lecture seule).
+    #    Ne JAMAIS importer src.database de TST ici : ce module initialise
+    #    SQLAlchemy/Postgres à l'import et peut bloquer (voire geler l'event
+    #    loop de l'API) — c'est arrivé le 2026-08-22, requête restée
+    #    "generating" indéfiniment.
+    import sqlite3
+
+    tst_cfg = cfg.get("projects", {}).get("tst", {})
+    tst_path = Path(tst_cfg.get("path", "")).expanduser() if tst_cfg.get("path") else None
+    token_ok = bool(tst_path and (tst_path / "data" / "token.json").exists())
+    if not token_ok and tst_path and tst_path.exists():
+        try:
+            con = sqlite3.connect(f"file:{tst_path / 'data' / 'dev.db'}?mode=ro", uri=True)
+            try:
+                row = con.execute(
+                    "SELECT 1 FROM social_connections WHERE platform='youtube' "
+                    "AND token_data IS NOT NULL AND token_data != '' LIMIT 1"
+                ).fetchone()
+                token_ok = row is not None
+            finally:
+                con.close()
+        except Exception:
+            token_ok = False  # DB absente/illisible → conservateur : pas de creds
+    if not token_ok:
+        print("✗ Upload activé (youtube.upload_enabled: true) mais aucun compte YouTube connecté :")
+        print("  → Depuis ~/MyWorkDirectory/TestShortYoutube, lance : python main.py auth")
+        print("  → (flux OAuth navigateur, une seule fois ; le token est stocké côté TST)")
+        print("  → Ou repasse youtube.upload_enabled à false.")
+        sys.exit(1)
+
+    print("  ✓ Pré-vol upload OK (dépendances OAuth + compte YouTube présents)")
+
+
+def _importable(module: str) -> bool:
+    """True si le module est importable, False sinon (sans lever d'exception)."""
+    try:
+        __import__(module)
+        return True
+    except ImportError:
+        return False
+
+
 def upload_video(video_path: str, script_path: str, thumbnail_path: str, subject: str | None, cfg: dict):
     """Étape 5 : upload et publication."""
     print("\n[5/5] Upload et publication...")
@@ -451,7 +526,15 @@ def upload_video(video_path: str, script_path: str, thumbnail_path: str, subject
     tst_path = Path(tst_path).expanduser()
 
     sys.path.insert(0, str(tst_path / "src"))
-    from uploader import upload_short
+    try:
+        from uploader import upload_short
+    except ModuleNotFoundError as e:
+        # Filet de sécurité : le pré-vol aurait dû le détecter, mais si
+        # l'environnement a changé entre-temps, autant échouer ici avec un
+        # message clair qu'avec un traceback opaque.
+        print(f"✗ Dépendances OAuth manquantes pour l'upload : {e}")
+        print("  → api/.venv/bin/pip install google-auth-oauthlib google-api-python-client")
+        sys.exit(1)
 
     metadata = _load_or_generate_metadata(script_path, subject, cfg)
     privacy = youtube_cfg.get("privacy_status", "private")
@@ -490,6 +573,11 @@ def main():
         sys.exit(1)
 
     cfg = load_config()
+
+    # Échoue en quelques secondes si l'upload est activé mais impossible
+    # (deps OAuth absentes / aucun compte connecté) — au lieu de 10 min de
+    # calcul puis un crash à l'étape [5/5] (cf. coran_lumiere_fr 2026-08-22).
+    _preflight_upload(cfg)
 
     print("=" * 60)
     print("Pipeline de production vidéo unifié")

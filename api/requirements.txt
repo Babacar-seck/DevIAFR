@@ -6,3 +6,8 @@ python-multipart==0.0.12
 aiofiles==24.1.0
 requests==2.32.3
 Pillow==10.4.0
+# Upload YouTube via TST/src/uploader.py (importé dans unified_pipeline.py) —
+# l'API exécute le pipeline avec son propre venv (api/.venv), qui doit donc
+# avoir les deps OAuth Google, sinon crash tardif "No module named 'google'".
+google-auth-oauthlib==1.4.0
+google-api-python-client==2.199.0

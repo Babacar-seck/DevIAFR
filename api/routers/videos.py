@@ -119,6 +119,28 @@ async def generate_video(request: VideoGenerateRequest):
         "created_at": created_at.isoformat(),
     })
 
+    # Pré-vol upload : si l'upload est activé mais impossible (deps OAuth
+    # absentes / aucun compte connecté), échoue en quelques millisecondes ICI,
+    # avant même le script LLM — au lieu de ~10 min de production puis un
+    # crash à l'étape [5/5] (cf. coran_lumiere_fr, 2026-08-22 17:38).
+    # Le pré-vol est stdlib-only (aucun import de src.database de TST, qui
+    # bloque sur SQLAlchemy/Postgres à l'import) → temps d'exécution borné.
+    if not request.dry_run:
+        sys.path.insert(0, str(SCRIPTS_DIR))
+        from unified_pipeline import _preflight_upload, load_config
+        try:
+            _preflight_upload(load_config())
+        except SystemExit:
+            db.update_video(
+                video_id,
+                status="failed",
+                error="Upload activé (youtube.upload_enabled: true) mais impossible : "
+                      "dépendances OAuth absentes ou aucun compte YouTube connecté. "
+                      "Lance `python main.py auth` côté TST, ou repasse upload_enabled à false.",
+            )
+            row = db.get_video(video_id)
+            return _row_to_info(row)
+
     # Étape 1 : script humanisé (toujours nécessaire, dry_run ou non)
     script_path = video_dir / "script.txt"
     proc = subprocess.run(
